@@ -1,0 +1,248 @@
+\documentclass[a4paper]{article} %tạo một bản báo cáo
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc} %để sử dụng tiếng việt
+\usepackage[fontsize=11pt]{scrextend} %set font=13pt
+\linespread{1.2}
+\usepackage[paperheight=29.7cm,paperwidth=21cm,right=2cm,left=1.8cm,top=2cm,bottom=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amsmath, amssymb, txfonts}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{diagbox}
+\usepackage{minted}
+\usepackage{vhistory}
+\usepackage{indentfirst}
+\usepackage{multirow}
+\usepackage{graphicx} %thư viện chèn ảnh
+\usepackage{float} % set vị trí chèn ảnh
+\usepackage{tikz} % thư viện tạo khung bìa
+\usetikzlibrary{calc} % thư viện tikz
+\renewcommand{\figurename}{\fontsize{12pt}{0pt}\selectfont \bfseries Hình}
+\renewcommand{\listfigurename}{Danh mục hình ảnh}
+\renewcommand{\listtablename}{Danh mục bảng}
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\usepackage{caption}
+\usepackage{enumerate} % để tùy chỉnh itemize
+\usepackage{array}    % để dùng m{width}
+\captionsetup[figure]{labelsep=space}
+\newtheorem{theorem}{Định lý}[section]
+\newtheorem{defn}{Định nghĩa}[section]
+\newtheorem{vd}{Ví dụ}[section]
+\newtheorem{proof}{Chứng minh}
+\usepackage{adjustbox}
+\usepackage{esint}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue]{hyperref}
+\usepackage{placeins}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{lastpage}
+\usepackage{enumerate}
+\usepackage{tcolorbox}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage[vietnamese]{babel}
+\usepackage[
+backend=biber,
+style=numeric,
+sorting=ynt
+]{biblatex}
+\DeclareLanguageMapping{vietnamese}{english}
+
+\newcommand{\StudentOneName}{Huỳnh Minh Tiến}
+\newcommand{\StudentOneID}{2313425}
+\newcommand{\StudentTwoName}{Nguyễn Ngọc Trúc Quỳnh}
+\newcommand{\StudentTwoID}{2312912}
+\newcommand{\StudentThreeName}{Nguyễn Đức Nghĩa}
+\newcommand{\StudentThreeID}{2312266}
+\newcommand{\StudentFourName}{Võ Tiến Nam}
+\newcommand{\StudentFourID}{2312205}
+\newcommand{\StudentFiveName}{Phạm Ngọc Tây}
+\newcommand{\StudentFiveID}{2313063}
+\newcommand{\StudentSixName}{Nguyễn Minh Thái}
+\newcommand{\StudentSixID}{2313101}
+\newcommand{\StudentSevenName}{Vũ Minh Châu}
+\newcommand{\StudentSevenID}{2310339}
+\newcommand{\StudentEightName}{Phan Đình Khang}
+\newcommand{\StudentEightID}{2311459}
+
+% \renewcommand\thesection{\Roman{section}.}            % 1, 2, 3
+% \renewcommand\thesubsection{\arabic{subsection}/}        % a, b, c
+% \renewcommand\thesubsubsection{\alph{subsubsection}/}% 1, 2, 3 (lại số nhỏ)
+
+% --- Nhưng vẫn muốn figure/table/equation dùng số thường ---
+\makeatletter
+\renewcommand{\thefigure}{\arabic{section}.\arabic{subsection}.\arabic{figure}}
+\renewcommand{\thetable}{\arabic{section}.\arabic{subsection}.\arabic{table}}
+\renewcommand{\theequation}{\arabic{section}.\arabic{subsection}.\arabic{equation}}
+% \geometry{left=3cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+\captionsetup{font=small,labelfont=bf}
+
+% Reset lại bộ đếm hình/bảng/phương trình mỗi khi qua section mới
+\@addtoreset{figure}{subsection}
+\@addtoreset{table}{subsection}
+\@addtoreset{equation}{subsection}
+\makeatother
+\addbibresource{references.bib}
+
+\setlength{\headheight}{40pt}
+\pagestyle{fancy}
+\fancyhead{} % clear all header fields
+\fancyhead[L]{
+ \begin{tabular}{rl}
+    \begin{picture}(25,15)(0,0)
+    \put(0,-8){\includegraphics[width=8mm, height=8mm]{figures/common/hcmut_logo.png}}
+    %\put(0,-8){\epsfig{width=10mm,figure=hcmut.eps}}
+   \end{picture}&
+	%\includegraphics[width=8mm, height=8mm]{01_logobachkhoa.png} & %
+	\begin{tabular}{l}
+		\textbf{\bf \ttfamily ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH}\\
+		\textbf{\bf \ttfamily TRƯỜNG ĐẠI HỌC BÁCH KHOA}
+	\end{tabular} 	
+ \end{tabular}
+}
+\fancyhead[R]{
+	\begin{tabular}{l}
+		\tiny \bf \\
+		\tiny \bf 
+	\end{tabular}  }
+\fancyfoot{} % clear all footer fields
+\fancyfoot[L]{\scriptsize \ttfamily Báo cáo Bài tập lớn - Môn: Kiến trúc phần mềm (CO3017)}
+\fancyfoot[R]{\scriptsize \ttfamily Trang {\thepage}/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.3pt}
+
+
+
+\begin{document}
+    \begin{titlepage}
+        \begin{tikzpicture}[overlay,remember picture]
+			\draw [line width=3pt]
+			($ (current page.north west) + (2.0cm,-2.0cm) $)
+			rectangle
+			($ (current page.south east) + (-2.0cm,2.5cm) $);
+			\draw [line width=0.5pt]
+			($ (current page.north west) + (2.1cm,-2.1cm) $)
+			rectangle
+			($ (current page.south east) + (-2.1cm,2.6cm) $);
+		\end{tikzpicture}
+		\begin{center}
+			\vspace{-6pt} \fontsize{13pt}{0pt}\selectfont ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH \\
+			\textbf{\fontsize{16pt}{0pt}\selectfont TRƯỜNG ĐẠI HỌC BÁCH KHOA}\\
+            \textbf{\fontsize{16pt}{0pt}\selectfont KHOA KHOA HỌC VÀ KỸ THUẬT MÁY TÍNH}
+			\vspace{1cm}
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=4.318cm,height=4.318cm]{figures/common/hcmut_logo.png}
+			\end{figure}
+			\vspace{0.5cm}
+            \rule{0.7\linewidth}{1pt} \\[0.3cm] % Đường thẳng trên
+			\textbf{\fontsize{16pt}{0pt}\selectfont BÁO CÁO BÀI TẬP LỚN}\\
+			\textbf{\fontsize{16pt}{0pt}\selectfont MÔN: KIẾN TRÚC PHẦN MỀM (CO3017)}\\
+                \vspace{0.5cm}
+                \parbox{0.9\linewidth}{\centering\textbf{\fontsize{16pt}{20pt}\selectfont THIẾT KẾ KIẾN TRÚC CHO HỆ THỐNG CHẤM CÔNG VÀ KIỂM SOÁT RA VÀO BẰNG MÃ QR}}\\
+            \vspace{0.5cm}
+            \rule{0.7\linewidth}{1pt} \\[1cm] % Đường thẳng dưới
+		\end{center}
+
+    \begin{table}[h]
+    \centering
+        \begin{tabular}{rl}
+        \hspace{3 cm}\textbf{GVHD}:
+        & ThS. Lê Đình Thuận\\
+        \textbf{Lớp}: & L01\\
+        \textbf{Sinh viên thực hiện}: & \StudentOneName{} - \StudentOneID\\
+        & \StudentTwoName{} - \StudentTwoID\\
+        & \StudentThreeName{} - \StudentThreeID\\
+        & \StudentFourName{} - \StudentFourID\\
+        & \StudentFiveName{} - \StudentFiveID\\
+        & \StudentSixName{} - \StudentSixID\\
+        & \StudentSevenName{} - \StudentSevenID\\
+        & \StudentEightName{} - \StudentEightID\\
+        \end{tabular}
+    \end{table}
+        \begin{center}
+			\fontsize{12pt}{0pt}\selectfont\ Thành phố Hồ Chí Minh, tháng \number\month\space năm \number\year\\
+		\end{center}
+    \end{titlepage}
+    \cleardoublepage
+
+    \begin{center}
+        \fontsize{13pt}{0pt}\selectfont \textbf{DANH SÁCH THÀNH VIÊN} \\
+        
+    \end{center}
+    \hspace{-1cm}
+
+    \begin{table}[H]
+        \centering
+        \small
+        \renewcommand{\arraystretch}{1.4}
+        \setlength{\tabcolsep}{8pt}
+        \begin{tabular}{|c|c|c|m{5cm}|>{\centering\arraybackslash}m{1.5cm}|}
+            \hline
+            \textbf{STT} & \textbf{Họ và tên} & \textbf{MSSV} & \textbf{Nhiệm vụ} & \textbf{\% Hoàn thành}\\
+            \hline
+            1 & \StudentOneName & \StudentOneID & Tổng hợp tài liệu và định dạng \LaTeX & 100 \\
+            \hline
+            2 & \StudentTwoName & \StudentTwoID & Phân tích miền nghiệp vụ và phong cách kiến trúc & 100 \\
+            \hline
+            3 & \StudentThreeName & \StudentThreeID & Thiết kế kiến trúc logic và nguyên tắc thiết kế & 100 \\
+            \hline
+            4 & \StudentFourName & \StudentFourID & Phân tích yêu cầu phi chức năng và đặc tính kiến trúc & 100 \\
+            \hline
+            5 & \StudentFiveName & \StudentFiveID & Thiết kế kiến trúc vật lý và các quyết định kiến trúc & 100 \\
+            \hline
+            6 & \StudentSixName & \StudentSixID & Thiết kế yêu cầu chức năng và đặc tả use-case & 100 \\
+            \hline
+            7 & \StudentSevenName & \StudentSevenID & Tổng hợp tài liệu và định dạng \LaTeX & 100 \\
+            \hline
+            8 & \StudentEightName & \StudentEightID & Bối cảnh và yêu cầu nghiệp vụ & 100 \\
+            \hline
+        \end{tabular}
+    \end{table}
+    \textbf{Ghi chú:} 
+
+
+    \cleardoublepage
+    \tableofcontents
+    \cleardoublepage
+    \phantomsection
+    \addcontentsline{toc}{section}{Danh mục bảng}
+    \listoftables
+    \cleardoublepage
+    \phantomsection
+    \addcontentsline{toc}{section}{Danh mục hình ảnh}
+    \listoffigures
+    \cleardoublepage
+    \begin{versionhistory}
+        \vhEntry{1.0}{2026.10.19}{TienHM}{Tạo tài liệu}
+        \vhEntry{1.1}{2026.10.21}{TienHM}{Bổ sung và chuẩn hóa yêu cầu chức năng FR-07--FR-28 về trạm cổng, chấm công, báo cáo, HR/Payroll, kiểm toán và quản trị hệ thống}
+        \vhEntry{1.2}{2026.10.22}{TienHM}{Bổ sung yêu cầu phi chức năng theo 8 tiêu chí; chuẩn hóa cột ID, tiêu đề Mô tả và thuật ngữ cổng xoay}
+        \vhEntry{1.3}{2026.10.23}{ChauVM}{Bổ sung phần 5, 6, 7, 8}
+        \vhEntry{1.4}{2026.10.23}{TienHM}{Cấu trúc lại các phần để thống nhất nội dung sau khi phân tích}
+    \end{versionhistory}
+    \cleardoublepage
+
+    % DONE
+
+    \include{section/1_Introduction}
+    \include{section/2_Context_System_Requirement}
+    \include{section/3_Requirements_Analysis}
+    \include{section/4_Domain_Model_Design}
+    \include{section/5_Architecture_Characteristics}
+    \include{section/6_Architecture_Structure}
+    \include{section/7_Architecture_Decisions}
+    \include{section/8_Design_Principles}
+    % \include{section/9_Conclusion}
+    \cleardoublepage
+    \nocite{martin2017clean,richards2025fundamentals,clements2010documenting,sommerville2015software,slidesCO3017}
+    \printbibliography[heading=bibintoc,title={Tài liệu tham khảo}]
+    \appendix
+    \cleardoublepage
+    \phantomsection
+    
+    \include{appendix}
+\end{document}

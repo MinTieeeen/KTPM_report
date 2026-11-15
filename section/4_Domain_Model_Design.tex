@@ -1,0 +1,124 @@
+\section{Thiết kế mô hình miền nghiệp vụ}
+\subsection{Luồng nghiệp vụ chính}
+
+\textbf{Luồng ra/vào qua cổng:}
+\begin{itemize}
+    \item Nhân viên mở mã QR trên TMC Employee Portal và xuất trình tại máy quét của trạm cổng.
+    \item Hệ thống xác thực mã QR, kiểm tra trạng thái hoạt động của nhân viên và xác định mã có bị thu hồi hay không.
+    \item Nếu mã QR hợp lệ, hệ thống gửi lệnh mở cổng xoay thông qua API của thiết bị hiện hữu.
+    \item Hệ thống ghi nhận giao dịch chấm công gồm nhân viên, thời điểm phát sinh, chiều vào/ra và thông tin trạm cổng khi sự kiện phát sinh từ thiết bị.
+    \item Kiosk hiển thị kết quả; thời gian xử lý toàn bộ luồng không vượt quá 2 giây.
+    \item Các lần quét bị từ chối vẫn được ghi nhận phục vụ giám sát và kiểm toán nhưng không được tính là giao dịch chấm công hợp lệ.
+\end{itemize}
+
+\textbf{Luồng điều chỉnh, chốt kỳ và truyền dữ liệu:}
+\begin{itemize}
+    \item Khi phát hiện dữ liệu chấm công bị thiếu hoặc sai, nhân sự có thẩm quyền thực hiện bổ sung hoặc điều chỉnh và nêu lý do cụ thể.
+    \item Giao dịch gốc không bị sửa trực tiếp; mọi thay đổi được ghi nhận để phục vụ truy vết.
+    \item Cuối tháng, hệ thống chốt kỳ chấm công, tổng hợp dữ liệu và truyền sang hệ thống HR/Payroll thông qua API.
+    \item Dữ liệu phải sẵn sàng trước 12:00 ngày 1 của tháng tiếp theo.
+    \item Khi truyền thất bại, hệ thống gửi lại đợt truyền tương ứng.
+    \item Nếu phát sinh điều chỉnh sau khi kỳ đã khóa, hệ thống tạo đợt truyền bổ sung để chuyển phần dữ liệu cần cập nhật.
+\end{itemize}
+
+\subsection{Các thực thể nghiệp vụ}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\raggedright\arraybackslash}m{4.5cm}|>{\raggedright\arraybackslash}m{11cm}|}
+    \caption{Các thực thể nghiệp vụ và ý nghĩa}\label{tab:business-entities}\\
+    \hline
+    \textbf{Thực thể} & \textbf{Ý nghĩa nghiệp vụ}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thực thể} & \textbf{Ý nghĩa nghiệp vụ}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{Factory} & Nhà máy thuộc Công ty Cổ phần Sản xuất TMC. Việc mở rộng sang nhà máy mới không đòi hỏi thay đổi cấu trúc nghiệp vụ cốt lõi.\\
+    \hline
+    \textbf{Department} & Bộ phận thuộc một nhà máy, dùng để tổ chức và quản lý nhân viên.\\
+    \hline
+    \textbf{Employee} & Nhân viên được quản lý trong hệ thống, là chủ thể của giao dịch chấm công và có thể là người giám sát nhân viên khác.\\
+    \hline
+    \textbf{QRCredential} & Thông tin định danh QR được cấp cho nhân viên, có trạng thái hoạt động hoặc thu hồi và có thể được cấp lại.\\
+    \hline
+    \textbf{GateStation} & Trạm kiểm soát ra/vào, tích hợp với máy quét, kiosk và cổng xoay hiện hữu; được cấu hình theo chiều vào hoặc ra.\\
+    \hline
+    \textbf{ManualGateOpening} & Sự kiện bảo vệ mở cổng thủ công trong trường hợp ngoại lệ, có thông tin người thực hiện và lý do.\\
+    \hline
+    \textbf{ScanAttempt} & Lần quét QR tại trạm cổng, bao gồm lần được chấp nhận và lần bị từ chối, kể cả khi mã không xác định được credential hợp lệ.\\
+    \hline
+    \textbf{AttendanceTransaction} & Giao dịch ghi nhận sự kiện vào hoặc ra của nhân viên. Giao dịch đã tạo không bị sửa trực tiếp.\\
+    \hline
+    \textbf{AttendanceAdjustment} & Bản ghi thể hiện thao tác bổ sung, hiệu chỉnh hoặc hủy hiệu lực giao dịch chấm công, có lý do và người thực hiện.\\
+    \hline
+    \textbf{PayrollPeriod} & Kỳ chấm công theo tháng, xác định phạm vi dữ liệu cần tổng hợp và trạng thái chốt kỳ.\\
+    \hline
+    \textbf{PayrollExportBatch} & Đợt truyền dữ liệu chấm công sang HR/Payroll, có loại đợt, tập dữ liệu gửi và trạng thái xử lý.\\
+    \hline
+    \textbf{UserAccount} & Tài khoản đăng nhập dành cho người thực hiện các chức năng được phân quyền. Không phải mọi nhân viên đều có tài khoản.\\
+    \hline
+    \textbf{Role} & Vai trò dùng để nhóm các quyền truy cập và thao tác trong hệ thống.\\
+    \hline
+    \textbf{Permission} & Quyền thực hiện một chức năng hoặc thao tác cụ thể trong hệ thống.\\
+    \hline
+    \textbf{AuditLogEntry} & Bản ghi kiểm toán về các thao tác quan trọng, phục vụ truy vết và kiểm tra lịch sử.\\
+    \hline
+    \textbf{SystemSetting} & Tham số cấu hình vận hành như lịch truyền dữ liệu HR/Payroll và thời gian lưu trữ dữ liệu.\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsection{Quan hệ giữa các thực thể}
+\begin{itemize}
+    \item \textbf{Tổ chức và nhân sự:} Mỗi nhà máy có thể có nhiều bộ phận và nhiều trạm kiểm soát ra/vào. Mỗi bộ phận thuộc một nhà máy và có thể quản lý nhiều nhân viên. Mỗi nhân viên thuộc một bộ phận tại một thời điểm và có thể được phân công cho một người giám sát trực tiếp. Một người giám sát có thể quản lý nhiều nhân viên.
+    \item \textbf{Nhân viên và mã QR} Mỗi mã QR được cấp cho một nhân viên cụ thể. Trong quá trình làm việc, một nhân viên có thể được cấp nhiều mã QR ở các thời điểm khác nhau do mã cũ bị thu hồi hoặc thay thế. Tuy nhiên, tại một thời điểm, mỗi nhân viên chỉ được sử dụng tối đa một mã QR đang hoạt động. Việc cấp mã mới không làm mất thông tin về các mã đã sử dụng trước đó.
+    \item \textbf{Nhân viên và tài khoản đăng nhập:} Thông tin nhân viên được quản lý độc lập với tài khoản đăng nhập hệ thống. Một nhân viên có thể không có tài khoản nếu chỉ cần sử dụng mã QR để ra/vào nhà máy. Khi được cấp tài khoản, mỗi nhân viên có tối đa một tài khoản liên kết và mỗi tài khoản chỉ liên kết với tối đa một nhân viên.
+    \item \textbf{Ghi nhận lần quét và giao dịch chấm công:} Mỗi lần quét QR diễn ra tại một trạm kiểm soát cụ thể. Một trạm có thể tiếp nhận nhiều lần quét, và một mã QR có thể được sử dụng trong nhiều lần quét. Hệ thống ghi nhận tất cả các lần quét, bao gồm cả những lần bị từ chối. Nếu mã QR không hợp lệ hoặc không xác định được nhân viên, hệ thống vẫn lưu thông tin lần quét nhưng không tạo giao dịch chấm công hợp lệ. Khi một lần quét được chấp nhận, hệ thống tạo tối đa một giao dịch chấm công tương ứng. Mỗi giao dịch chấm công được ghi nhận cho một nhân viên. Giao dịch phát sinh từ việc quét QR gắn với trạm kiểm soát nơi sự kiện xảy ra; giao dịch được bổ sung thủ công có thể không gắn với trạm nếu không xác định được địa điểm phát sinh. Một nhân viên có thể có nhiều giao dịch chấm công theo thời gian.
+    \item \textbf{Điều chỉnh dữ liệu chấm công:} Một giao dịch chấm công có thể được điều chỉnh nhiều lần nếu phát hiện sai sót hoặc cần bổ sung thông tin. Mỗi lần điều chỉnh phải lưu lý do và tài khoản của người thực hiện. Nếu cần sửa hoặc hủy hiệu lực giao dịch đã ghi nhận, hệ thống lưu lại thông tin điều chỉnh và giữ nguyên dữ liệu gốc để phục vụ truy vết. Nếu cần bổ sung một giao dịch còn thiếu, hệ thống tạo giao dịch mới và ghi nhận việc bổ sung tương ứng.
+    \item \textbf{Mở cổng thủ công:} Mỗi lần mở cổng thủ công diễn ra tại một trạm kiểm soát và phải ghi nhận tài khoản của nhân viên bảo vệ thực hiện cùng lý do mở cổng. Một trạm có thể phát sinh nhiều sự kiện mở cổng thủ công. Việc mở cổng thủ công chỉ ghi nhận sự kiện mở cổng, không mặc nhiên tạo giao dịch chấm công cho một nhân viên.
+    \item \textbf{Kỳ chấm công và truyền dữ liệu sang HR/Payroll:} Mỗi đợt truyền dữ liệu thuộc một kỳ chấm công cụ thể. Một kỳ có thể có nhiều đợt truyền, bao gồm đợt truyền chính và các đợt truyền bổ sung. Mỗi đợt truyền chứa các giao dịch chấm công cần gửi sang hệ thống HR/Payroll. Một giao dịch có thể được gửi trong nhiều đợt nếu cần cập nhật dữ liệu sau khi kỳ đã chốt. Nếu một đợt truyền thất bại, hệ thống thực hiện gửi lại đợt đó và lưu kết quả từng lần thử. Nếu dữ liệu cần điều chỉnh sau khi kỳ đã khóa, hệ thống tạo đợt truyền bổ sung để gửi phần thông tin cần cập nhật. Việc này giúp phân biệt giữa gửi lại dữ liệu do lỗi kỹ thuật và gửi dữ liệu mới phát sinh từ điều chỉnh nghiệp vụ.
+    \item \textbf{Phân quyền người dùng:} Mỗi tài khoản có thể được gán một hoặc nhiều vai trò, và một vai trò có thể được sử dụng bởi nhiều tài khoản. Mỗi vai trò bao gồm các quyền tương ứng với những chức năng mà người dùng được phép thực hiện. Một quyền có thể được sử dụng trong nhiều vai trò khác nhau. Cách tổ chức này giúp quản lý quyền truy cập theo chức trách, chẳng hạn như nhân sự, bảo vệ hoặc quản trị viên.
+    \item \textbf{Kiểm toán hoạt động:} Hệ thống ghi nhận các thao tác quan trọng vào nhật ký kiểm toán để xác định ai đã thực hiện thao tác gì và vào thời điểm nào. Một tài khoản có thể phát sinh nhiều bản ghi kiểm toán. Mỗi bản ghi có thể gắn với tài khoản thực hiện; đối với thao tác do hệ thống tự động thực hiện, nhật ký cần ghi rõ tác nhân hệ thống tương ứng. Nhật ký kiểm toán phải được giữ lại ngay cả khi tài khoản bị khóa hoặc nhân viên ngừng làm việc.
+    \item \textbf{Cấu hình hệ thống:} \textbf{SystemSetting} lưu các tham số phục vụ vận hành, chẳng hạn như lịch truyền dữ liệu sang HR/Payroll và thời gian lưu trữ dữ liệu. Các tham số này được quản lý theo nhu cầu cấu hình của hệ thống. Khi có yêu cầu kiểm soát việc thay đổi cấu hình, hệ thống cần ghi nhận tài khoản thực hiện và lưu lại thao tác tương ứng trong nhật ký kiểm toán.
+\end{itemize}
+\subsection{Lược đồ lớp mức nghiệp vụ cho hệ thống}
+
+\begin{center}
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!65!black,boxrule=0.8pt,arc=2mm,width=0.9\linewidth]
+    Xem chi tiết lược đồ \href{https://lucid.app/lucidchart/e0a5dedd-8bde-47f6-bf30-5573646d377d/edit?viewport_loc=-833\%2C-137\%2C4317\%2C2380\%2C0_0\&invitationId=inv_d1e0daeb-1bca-47f8-8cf9-feb31f6cda40}{\textcolor{blue!70!black}{tại đây}}
+\end{tcolorbox}
+\end{center}
+
+\begin{figure}[p]
+    \centering
+    \rotatebox{90}{\includegraphics[width=0.92\textheight,height=0.92\textwidth,keepaspectratio]{figures/04_domain_model/class_diagram.png}}
+    \caption{Lược đồ lớp mức nghiệp vụ của hệ thống chấm công và kiểm soát ra vào}
+    \label{fig:sa-class-diagram}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

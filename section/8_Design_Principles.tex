@@ -1,0 +1,125 @@
+\section{Nguyên lý thiết kế hệ thống}
+Nguyên tắc thiết kế (DP) là hướng dẫn giúp nhóm đưa ra các lựa chọn thiết kế nhỏ mà quyết định kiến trúc (mục 6) không quy định hết. Hai loại này khác nhau như sau:
+
+\begin{itemize}
+    \item ADR là luật: bắt buộc, chỉ đổi được bằng một ADR mới.
+    \item DP là hướng dẫn: có nêu rõ khi nào được phép linh hoạt.
+\end{itemize}
+
+Mỗi nguyên tắc gồm bốn phần: phát biểu, lý do gắn với NFR và đặc tính kiến trúc, ví dụ áp dụng trong TMC, và trường hợp được linh hoạt.
+
+\subsection{Nguyên tắc cấp kiến trúc}
+
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\centering\arraybackslash}p{1.2cm}|>{\raggedright\arraybackslash}p{3.8cm}|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{3.4cm}|}
+\caption{Nguyên tắc thiết kế cấp kiến trúc} \\
+\hline
+\textbf{Mã} & \textbf{Nguyên tắc} & \textbf{Lý do} & \textbf{Áp dụng trong TMC} & \textbf{Khi nào được linh hoạt} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Nguyên tắc} & \textbf{Lý do} & \textbf{Áp dụng trong TMC} & \textbf{Khi nào được linh hoạt} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{5}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+DP-01 & Cổng tự chủ và an toàn khi lỗi. Luồng xử lý lần quét không gọi đồng bộ về trung tâm. Khi thiếu thông tin, chiều vào đóng an toàn, còn chiều ra luôn mở & NFR-01, NFR-07; Performance, Availability/Offline & G1 xác thực bằng danh sách QR cục bộ ở G3. Khi mất kết nối quá ngưỡng, chiều vào chuyển fail-closed và bảo vệ mở thủ công qua G5 & Các thao tác không nằm trên luồng quét (cấp QR, xem báo cáo) được gọi trung tâm đồng bộ \\
+\hline
+DP-02 & Lưu bền vững trước khi xác nhận. Không báo thành công cho thao tác nào khi dữ liệu của nó chưa được lưu bền vững & NFR-02, INV-05; Reliability/Data Integrity & G1 ghi giao dịch vào G3 trước khi mở cổng và báo thành công. C4 ghi đợt xuất trước khi C5 gửi đi & Dữ liệu dựng lại được, như read model của C6 hay heartbeat, không cần ghi trước \\
+\hline
+DP-03 & Dữ kiện bất biến, sửa bằng bản ghi mới. Dữ kiện đã ghi không bị sửa hay xóa & INV-06, INV-08, INV-10; Reliability/Data Integrity, Auditability & AttendanceTransaction, ScanAttempt và AuditLogEntry chỉ ghi thêm. Sửa công bằng AttendanceAdjustment; sau khi khóa kỳ thì dùng đợt SUPPLEMENTAL & Dữ liệu danh mục (hồ sơ nhân viên, cấu hình trạm) được cập nhật tại chỗ, nhưng mỗi thay đổi phải ghi audit \\
+\hline
+DP-04 & Idempotent cho mọi thao tác có thể lặp lại. Gửi lại hay xử lý lại không được tạo bản ghi trùng & NFR-02, INV-06; Reliability/Data Integrity & eventId được sinh tại cổng và C1 bỏ qua bản trùng. Mỗi đợt xuất HR có mã đợt để gửi lại không tạo trùng & Thao tác chỉ đọc vốn đã idempotent, không cần khóa chống trùng \\
+\hline
+DP-05 & Bất đồng bộ cho việc không cần kết quả ngay. Việc nào người dùng không chờ thì đưa ra khỏi luồng chính & NFR-01, NFR-03; Performance, Reliability/Data Integrity & Đồng bộ Q1--Q2 và truyền dữ liệu HR đi qua outbox, không dùng broker (mục 6.2). Audit không phục vụ quyết định mở cổng được ghi nền nhưng vẫn bền vững & Lệnh mở cổng và kiểm tra quyền luôn đồng bộ vì người dùng đang chờ kết quả \\
+\hline
+DP-06 & Cách ly hệ thống ngoài sau adapter. Nghiệp vụ lõi không phụ thuộc trực tiếp vào API bên ngoài & NFR-09, C-01; Interoperability, Modifiability & G2 và C5 cài đặt interface do domain định nghĩa, có timeout, circuit breaker và gửi lại & Thư viện hạ tầng nội bộ ổn định (CSDL, logging) được dùng trực tiếp ở tầng infrastructure, không cần adapter riêng \\
+\hline
+DP-07 & Đặc quyền tối thiểu và audit thao tác nhạy cảm. Mỗi vai trò chỉ có quyền tối thiểu; thao tác nhạy cảm phải để lại dấu vết & NFR-04, NFR-05, INV-11; Security, Auditability & C7 kiểm tra quyền ở phía server cho mọi API. Giám sát chỉ thấy nhân viên mình phụ trách. Mở cổng thủ công và điều chỉnh công bắt buộc có lý do và được ghi vào C8 & Kiosk không yêu cầu đăng nhập; quyền được thay bằng việc xác thực QR và chiều của trạm \\
+\hline
+DP-08 & Bảo vệ dữ liệu cá nhân từ thiết kế. Chỉ thu thập, lưu và hiển thị dữ liệu cá nhân khi thật sự cần & NFR-06, C-03; Privacy, Security & Bản sao tại cổng chỉ giữ mã QR, mã nhân viên và trạng thái. Dữ liệu được mã hóa khi truyền và khi lưu, kể cả trong G3. Báo cáo che dữ liệu theo vai trò; thời hạn lưu đặt ở C9 & HR được xem đầy đủ hồ sơ khi xử lý nghiệp vụ, nhưng mỗi lần xem đều được ghi audit (FR-21) \\
+\end{longtable}
+\normalsize
+
+\subsection{Áp dụng SOLID trong thiết kế TMC}
+Bảng 8.2.1 chỉ ra mỗi nguyên lý SOLID được áp dụng ở đâu trong TMC. Các interface được nhắc tới trong bảng được phác thảo dưới đây: domain định nghĩa các port này, còn adapter cài đặt chúng.
+
+\begin{verbatim}
+interface AllowlistReader   { Optional<QrEntry> find(String qrToken); }
+interface TransactionStore  { void append(AttendanceTransaction tx); }
+interface TurnstileGateway  { GateResult open(StationId station, Duration timeout); }
+interface HrPayrollGateway  { ExportReceipt submit(ExportBatch batch); }
+interface AttendanceQuery   { List<AttendanceTransaction> byEmployee(EmployeeId id, Period p); }
+interface AdjustmentCommand { void adjust(TransactionId id, Adjustment change, String reason); }
+\end{verbatim}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\caption{Áp dụng SOLID trong TMC}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{4.2cm}|}
+\hline
+\textbf{Nguyên tắc} & \textbf{Áp dụng ở đâu} & \textbf{Lợi ích} \\
+\hline
+Single Responsibility & G1, G2 và G4 được tách riêng, mỗi component chỉ có một lý do để thay đổi: G1 đổi khi quy tắc xác thực đổi (ví dụ anti-passback), G2 khi đổi nhà cung cấp cổng xoay, G4 khi đổi cơ chế đồng bộ & Đổi một phía không phải kiểm thử lại các phía còn lại \\
+\hline
+Open/Closed & Thêm nhà cung cấp cổng xoay hoặc loại thiết bị xác thực bằng một plugin mới cài đặt TurnstileGateway, theo kiểu microkernel trong Gate Agent (mục 6.2). Thêm định dạng báo cáo bằng một ReportExporter mới & Mở rộng được mà không sửa mã đang chạy ổn định tại cổng \\
+\hline
+Liskov Substitution & Mọi cài đặt TurnstileGateway, dù là thiết bị thật hay bộ giả lập dùng khi kiểm thử tải, đều tuân cùng một hợp đồng: trả kết quả hoặc lỗi trong thời gian timeout, không chặn luồng quét & Kiểm thử G1 và kịch bản đổi ca mà không cần phần cứng \\
+\hline
+Interface Segregation & Tách AttendanceQuery (dùng cho C6, giám sát và nhân viên) khỏi AdjustmentCommand (chỉ HR dùng, qua C4). Tách AllowlistReader (G1 chỉ đọc) khỏi giao diện cập nhật danh sách (chỉ G4 dùng) & Mỗi bên chỉ thấy những thao tác được phép, khớp với DP-07 \\
+\hline
+Dependency Inversion & Domain định nghĩa TurnstileGateway, HrPayrollGateway và TransactionStore; adapter ở tầng infrastructure cài đặt các interface này & Thay API bên ngoài hay kho lưu trữ không ảnh hưởng nghiệp vụ lõi (NFR-09) \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Cohesion, coupling và tổ chức mã nguồn}
+Tổ chức theo feature ở cấp cao nhất. Mã nguồn được chia package theo feature, khớp với cách phân rã theo domain ở mục 6.1.4: mỗi module ứng với một component trong Bảng 6.3.1. Bên trong mỗi module dùng ports and adapters với bốn tầng: api, application, domain và infrastructure. Cách tổ chức này có ba lợi ích:
+
+\begin{itemize}
+    \item Một thay đổi nghiệp vụ chỉ nằm gọn trong một module.
+    \item Mỗi aggregate (mục 3.4) nằm trọn trong một module.
+    \item Mỗi thành viên có thể phụ trách một module mà ít đụng phần của người khác.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/08_design_principles/module_structure.png}
+\caption{Cấu trúc module (development view)}
+\end{figure}
+
+\noindent\textbf{Quy tắc phụ thuộc giữa các module}
+
+\begin{enumerate}
+    \item Phụ thuộc hướng vào trong. domain không phụ thuộc application, infrastructure hay framework; infrastructure cài đặt port của domain (DIP).
+    \item Chỉ dùng module khác qua cửa công khai. Một module chỉ dùng module khác qua package api công khai hoặc qua domain event. Không module nào được truy cập entity hay bảng dữ liệu của module khác, vì mỗi module sở hữu dữ liệu riêng (Bảng 6.3.1).
+    \item iam và audit là module xuyên suốt. Mọi module được phụ thuộc vào interface của hai module này, nhưng chúng không phụ thuộc ngược lại vào module nghiệp vụ.
+    \item reporting chỉ đọc. Module này dựng read model từ domain event và không ghi vào module khác.
+    \item gate-agent và central không dùng chung mã nghiệp vụ. Hai bên chỉ dùng chung sync-contract, để hai quantum triển khai độc lập được (mục 6.1.4).
+    \item Không có vòng phụ thuộc giữa các module. Quy tắc 1--5 được kiểm tra tự động bằng test kiến trúc trong quy trình build, ví dụ ArchUnit nếu dùng Java.
+\end{enumerate}
+
+\noindent\textbf{Quy ước bổ sung}
+
+\begin{itemize}
+    \item Tham số thay đổi theo nhà máy hoặc theo thời gian (ngưỡng mất kết nối, lịch truyền HR, thời hạn lưu dữ liệu) đặt trong config, không viết cứng trong mã (NFR-08).
+    \item Mỗi module cung cấp health check và metric, ví dụ độ sâu outbox, độ trễ đồng bộ, trạng thái đợt xuất, để phục vụ Observability.
+\end{itemize}
+
+\noindent\textbf{Đánh giá cohesion và coupling}
+
+\begin{itemize}
+    \item Cohesion cao: mỗi module gói trọn một subdomain hoặc một aggregate.
+    \item Coupling thấp: trong Central Quantum, các module chỉ phụ thuộc nhau qua interface và domain event. Giữa hai quantum, phụ thuộc duy nhất là sync-contract, giao tiếp bất đồng bộ.
+\end{itemize}

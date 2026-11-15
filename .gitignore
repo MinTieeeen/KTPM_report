@@ -1,0 +1,38 @@
+# ===== Kết quả build LaTeX =====
+build/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.hst
+*.ver
+*.lof
+*.lot
+*.toc
+*.out
+*.log
+*.run.xml
+*.synctex.gz
+*.synctex(busy)
+*.xdv
+*.nav
+*.snm
+*.vrb
+_minted*/
+# PDF tạo ra ở thư mục gốc khi build không dùng -outdir
+/main.pdf
+
+# ===== Tài liệu kế hoạch chỉnh sửa (chỉ dùng nội bộ, không push) =====
+Review_*.md
+KeHoach_*.md
+
+# ===== Editor / hệ điều hành =====
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini

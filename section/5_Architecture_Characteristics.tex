@@ -1,0 +1,152 @@
+\section{Đặc tính kiến trúc hệ thống}
+
+Dựa trên bối cảnh nghiệp vụ, các yêu cầu chức năng, yêu cầu phi chức năng và những rủi ro đã xác định, hệ thống TMC có các đặc tính kiến trúc quan trọng sau đây.
+
+\subsection{Architecture Characteristics Worksheet}
+
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\centering\arraybackslash}p{0.65cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{4.7cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\centering\arraybackslash}p{1.8cm}|}
+\caption{Architecture Characteristics Worksheet} \\
+\hline
+\textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Mô tả trong bối cảnh hệ thống TMC} & \textbf{Cơ sở xác định} & \textbf{Mức độ ưu tiên} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Mô tả trong bối cảnh hệ thống TMC} & \textbf{Cơ sở xác định} & \textbf{Mức độ ưu tiên} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+1 & Performance -- Hiệu năng & Đảm bảo quá trình xác thực QR, điều khiển cổng và phản hồi kết quả cho người dùng diễn ra nhanh chóng, đặc biệt trong giờ giao ca. & FR-14; NFR-AVL-02; R-01; mục 4.1 & Rất cao \\
+\hline
+2 & Availability -- Tính sẵn sàng & Duy trì hoạt động chấm công và kiểm soát ra vào khi xảy ra sự cố kết nối giữa trạm cổng và hệ thống trung tâm; hỗ trợ lưu trữ và đồng bộ dữ liệu khi kết nối được khôi phục. & FR-17; nhóm NFR-AVL; R-02 & Rất cao \\
+\hline
+3 & Reliability -- Độ tin cậy & Đảm bảo các giao dịch chấm công đã xác nhận được bảo toàn, việc gửi lại yêu cầu không tạo ra giao dịch trùng lặp và các lỗi tích hợp được xử lý phù hợp. & NFR-REL-01 đến NFR-REL-04; FR-21, FR-22; R-03, R-05 & Rất cao \\
+\hline
+4 & Data Integrity -- Tính toàn vẹn dữ liệu & Đảm bảo dữ liệu chấm công chính xác, đầy đủ và không bị ghi nhận trùng lặp; các điều chỉnh phải bảo toàn bản ghi gốc và lịch sử thay đổi. & NFR-DIN-01 đến NFR-DIN-04; FR-15, FR-16 & Rất cao \\
+\hline
+5 & Security -- Bảo mật & Ngăn chặn truy cập trái phép, kiểm soát quyền truy cập theo vai trò và chỉ cho phép mở cổng khi thông tin xác thực đáp ứng các điều kiện hợp lệ. & NFR-SEC-01 đến NFR-SEC-04; FR-25 đến FR-27 & Rất cao \\
+\hline
+6 & Interoperability -- Khả năng tương tác & Đảm bảo hệ thống trao đổi dữ liệu chính xác và nhất quán với hệ thống cổng xoay và hệ thống HR/Payroll thông qua các giao diện tích hợp được hỗ trợ. & NFR-INT-01 đến NFR-INT-04; C-01, C-02 & Cao \\
+\hline
+7 & Auditability -- Khả năng kiểm toán & Đảm bảo các thao tác quản trị, lần quét QR bị từ chối, sự kiện kiểm soát ra vào và các lần truyền dữ liệu đều được ghi nhận để phục vụ truy vết và kiểm tra khi cần thiết. & NFR-AUD-01 đến NFR-AUD-04; FR-23, FR-24 & Cao \\
+\hline
+8 & Privacy -- Bảo vệ dữ liệu cá nhân & Bảo vệ thông tin cá nhân của nhân viên thông qua kiểm soát quyền truy cập, giới hạn dữ liệu được chia sẻ cho các hệ thống liên quan và tuân thủ các quy định về bảo vệ dữ liệu cá nhân. & NFR-PRI-01 đến NFR-PRI-04; C-03 & Cao \\
+\hline
+9 & Recoverability -- Khả năng phục hồi & Đảm bảo dữ liệu chấm công có thể được khôi phục khi xảy ra sự cố, đồng thời duy trì các thông tin quan trọng cần thiết để xác định và đối chiếu giao dịch. & NFR-REC-01, NFR-REC-02 & Cao \\
+\hline
+10 & Scalability -- Khả năng mở rộng & Đảm bảo hệ thống có khả năng đáp ứng nhu cầu xử lý chấm công tại cả hai nhà máy và hỗ trợ sự gia tăng về số lượng nhân viên, trạm cổng và lưu lượng giao dịch. & Quy mô hệ thống tại mục 2.1; C-04; R-01 & Trung bình \\
+\end{longtable}
+\normalsize
+
+\noindent\textbf{Nhận xét:} Các đặc tính có mức ưu tiên rất cao gồm hiệu năng, tính sẵn sàng, độ tin cậy, tính toàn vẹn dữ liệu và bảo mật. Đây là những yếu tố ảnh hưởng trực tiếp đến hoạt động kiểm soát ra vào, độ chính xác của dữ liệu chấm công và tính liên tục của nghiệp vụ tại hai nhà máy. Các đặc tính còn lại hỗ trợ việc tích hợp hệ thống, truy vết hoạt động, bảo vệ dữ liệu cá nhân, phục hồi sau sự cố và đáp ứng nhu cầu vận hành khi quy mô hệ thống tăng lên.
+
+\subsection{Lựa chọn đặc tính kiến trúc ưu tiên (Top 3 Driving Factors)}
+
+Dựa trên Architecture Characteristics Worksheet, ba đặc tính kiến trúc được lựa chọn làm yếu tố dẫn dắt chính cho hệ thống TMC là Performance, Reliability và Data Integrity. Việc lựa chọn này xuất phát từ yêu cầu xử lý nhanh các lượt quét QR, đảm bảo hoạt động chấm công đáng tin cậy và duy trì tính chính xác của dữ liệu phục vụ đối chiếu, tổng hợp và chuyển giao cho hệ thống HR/Payroll.
+
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\centering\arraybackslash}p{0.7cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{5.8cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
+\caption{Các đặc tính kiến trúc dẫn dắt chính} \\
+\hline
+\textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Cơ sở lựa chọn} & \textbf{Ảnh hưởng đến quyết định kiến trúc} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Cơ sở lựa chọn} & \textbf{Ảnh hưởng đến quyết định kiến trúc} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+1 & Performance -- Hiệu năng & Hệ thống phải xử lý nhanh các lượt quét QR, đặc biệt trong giờ giao ca, nhằm hạn chế ùn tắc tại cổng. Báo cáo cũng xác định nguy cơ quá tải khi lưu lượng giao dịch tăng cao. & Ưu tiên luồng xử lý ngắn, hạn chế các thao tác đồng bộ không cần thiết trên luồng mở cổng và đảm bảo khả năng xử lý tải tại các trạm cổng. \\
+\hline
+2 & Reliability -- Độ tin cậy & Sự cố kết nối, lỗi điều khiển cổng hoặc lỗi tích hợp HR/Payroll có thể làm gián đoạn nghiệp vụ và ảnh hưởng đến việc chuyển giao dữ liệu đúng hạn. & Cần có cơ chế xử lý lỗi, thử lại có kiểm soát, theo dõi trạng thái giao dịch và đồng bộ dữ liệu sau khi kết nối được khôi phục. \\
+\hline
+3 & Data Integrity -- Tính toàn vẹn dữ liệu & Dữ liệu chấm công phải chính xác, không bị ghi nhận trùng lặp và có thể truy xuất lịch sử điều chỉnh. Sai lệch dữ liệu có thể ảnh hưởng đến quá trình đối chiếu ngày công và tính lương ở hệ thống bên ngoài. & Ưu tiên quản lý giao dịch nhất quán, định danh duy nhất cho các giao dịch, kiểm soát yêu cầu gửi lại và bảo toàn bản ghi gốc khi điều chỉnh. \\
+\end{longtable}
+\normalsize
+
+
+Các đặc tính còn lại vẫn là những yêu cầu quan trọng của hệ thống, nhưng không được lựa chọn làm ba yếu tố dẫn dắt chính vì chúng có phạm vi tác động khác nhau hoặc có thể được xem xét như các yêu cầu cần đáp ứng trong quá trình hiện thực hóa kiến trúc.
+
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{10.7cm}|}
+\caption{Lý do các đặc tính còn lại không thuộc Top 3 Driving Factors} \\
+\hline
+\textbf{Đặc tính kiến trúc} & \textbf{Lý do không thuộc Top 3 Driving Factors} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Đặc tính kiến trúc} & \textbf{Lý do không thuộc Top 3 Driving Factors} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+Availability -- Tính sẵn sàng & Tính liên tục của hoạt động tại cổng rất quan trọng, đặc biệt khi mất kết nối. Tuy nhiên, trong phạm vi lựa chọn ba yếu tố dẫn dắt, vấn đề này được xem xét cùng với độ tin cậy và cơ chế xử lý lỗi, lưu trữ tạm thời, đồng bộ dữ liệu. Đặc tính này vẫn cần được đảm bảo trong thiết kế kiến trúc. \\
+\hline
+Security -- Bảo mật & Bảo mật là yêu cầu bắt buộc vì hệ thống xử lý thông tin nhân viên và kiểm soát quyền ra vào. Tuy nhiên, đây là yêu cầu nền tảng cần được áp dụng xuyên suốt các thành phần, thay vì được chọn làm yếu tố dẫn dắt chính cho cấu trúc xử lý nghiệp vụ trong phạm vi phân tích này. \\
+\hline
+Interoperability -- Khả năng tương tác & Việc tích hợp với cổng xoay và HR/Payroll là cần thiết, nhưng phạm vi tích hợp đã được xác định thông qua các giao diện và ràng buộc nghiệp vụ. Các vấn đề lỗi tích hợp, gửi lại dữ liệu và bảo toàn giao dịch được xem xét dưới góc độ Reliability và Data Integrity. \\
+\hline
+Auditability -- Khả năng kiểm toán & Ghi nhận nhật ký và truy vết là cần thiết cho quản trị và xử lý sự cố, nhưng không trực tiếp quyết định luồng xử lý giao dịch cốt lõi ở mức độ như ba đặc tính đã chọn. Yêu cầu này vẫn phải được đáp ứng thông qua cơ chế ghi nhật ký phù hợp. \\
+\hline
+Privacy -- Bảo vệ dữ liệu cá nhân & Việc bảo vệ dữ liệu cá nhân là nghĩa vụ cần tuân thủ. Các biện pháp liên quan đến phân quyền, giới hạn dữ liệu chia sẻ và quản lý lưu trữ cần được áp dụng xuyên suốt kiến trúc, nhưng không phải yếu tố dẫn dắt chính cho luồng giao dịch chấm công trong phân tích này. \\
+\hline
+Recoverability -- Khả năng phục hồi & Khả năng khôi phục dữ liệu sau sự cố rất quan trọng, nhưng chủ yếu liên quan đến sao lưu và phục hồi khi xảy ra sự cố. Trong phạm vi lựa chọn Top 3, đặc tính này được xem xét cùng các cơ chế bảo toàn dữ liệu và xử lý lỗi của Reliability và Data Integrity. \\
+\hline
+Scalability -- Khả năng mở rộng & Hệ thống hiện được xác định triển khai tại hai nhà máy với quy mô nhân sự đã nêu trong báo cáo. Yêu cầu nổi bật hiện tại là xử lý tải chấm công trong giờ giao ca; do chưa có mục tiêu tăng trưởng định lượng cụ thể, khả năng mở rộng chưa được chọn làm yếu tố dẫn dắt chính. \\
+\end{longtable}
+\normalsize
+
+\subsection{Đánh giá sự đánh đổi (Trade-offs)}
+
+Các đặc tính kiến trúc có thể hỗ trợ hoặc xung đột với nhau. Do đó, việc ưu tiên ba đặc tính trên cần đi kèm đánh giá những đánh đổi có thể phát sinh trong quá trình thiết kế và triển khai hệ thống TMC.
+
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{5.8cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
+\caption{Đánh giá trade-off giữa các đặc tính kiến trúc} \\
+\hline
+\textbf{Cặp đặc tính} & \textbf{Sự đánh đổi} & \textbf{Định hướng cân bằng} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Cặp đặc tính} & \textbf{Sự đánh đổi} & \textbf{Định hướng cân bằng} \\
+\hline
+\endhead
+\hline
+\multicolumn{3}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
+\endfoot
+\hline
+\endlastfoot
+Performance -- Reliability & Thử lại yêu cầu, chờ xác nhận từ hệ thống bên ngoài hoặc thực hiện các bước kiểm tra bổ sung có thể làm tăng thời gian xử lý một lượt quét. & Giới hạn thời gian chờ trên luồng xử lý tại cổng; tách việc xử lý lại và đồng bộ dữ liệu sang các tác vụ phù hợp khi không cần hoàn thành ngay để phản hồi người dùng. \\
+\hline
+Performance -- Data Integrity & Kiểm tra tính duy nhất, ghi nhận giao dịch bền vững và thực hiện các ràng buộc toàn vẹn có thể làm tăng độ trễ xử lý. & Tối ưu thao tác ghi dữ liệu và thiết kế giao dịch phù hợp, nhưng không bỏ qua các kiểm soát cần thiết để ngăn mất hoặc ghi nhận trùng dữ liệu chấm công. \\
+\hline
+Reliability -- Data Integrity & Cơ chế thử lại khi xảy ra lỗi có thể tạo giao dịch trùng lặp nếu hệ thống không xác định được yêu cầu đã được xử lý hay chưa. & Sử dụng định danh giao dịch ổn định, xử lý yêu cầu theo hướng idempotent và lưu trạng thái xử lý để việc thử lại không làm sai lệch dữ liệu. \\
+\hline
+Performance -- Security & Việc xác thực, kiểm tra quyền và kiểm tra trạng thái QR có thể làm tăng thời gian xử lý. & Tối ưu cơ chế xác thực và truy vấn trạng thái nhưng vẫn phải bảo đảm QR hợp lệ trước khi cho phép mở cổng. \\
+\hline
+Reliability -- Availability & Phụ thuộc hoàn toàn vào hệ thống trung tâm có thể khiến trạm cổng bị ảnh hưởng khi mạng gián đoạn; xử lý ngoại tuyến lại tạo thêm yêu cầu đồng bộ và kiểm soát tính nhất quán. & Xác định rõ phạm vi xử lý khi mất kết nối, chính sách lưu dữ liệu tạm thời và quy tắc đồng bộ sau khi hệ thống hoạt động trở lại. \\
+\end{longtable}
+\normalsize
+
+Từ các đánh đổi trên, hệ thống cần ưu tiên thời gian phản hồi nhanh nhưng không đánh đổi tính chính xác và khả năng bảo toàn giao dịch. Đối với các thao tác không thể hoàn tất ngay do lỗi kết nối với hệ thống bên ngoài, cần phân biệt rõ trạng thái đã hoàn thành, đang chờ xử lý và thất bại thay vì thông báo thành công khi chưa có đủ căn cứ.
+
+\noindent\textbf{Kết luận}
+
+Performance, Reliability và Data Integrity là ba đặc tính kiến trúc dẫn dắt chính của hệ thống TMC. Các quyết định thiết kế cần cân bằng thời gian phản hồi nhanh với khả năng xử lý lỗi và bảo toàn tính chính xác của dữ liệu chấm công.

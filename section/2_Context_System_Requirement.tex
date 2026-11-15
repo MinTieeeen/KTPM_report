@@ -1,0 +1,200 @@
+\section{Nghiên cứu bối cảnh và phân tích nghiệp vụ}
+\subsection{Bối cảnh doanh nghiệp}
+Công ty Cổ phần Sản xuất TMC hoạt động trong lĩnh vực sản xuất công nghiệp với quy mô hiện tại gồm 2 nhà máy chính:
+\begin{itemize}
+    \item \textbf{Nhà máy Bình Dương:} Quy mô khoảng 800 nhân viên.
+    \item \textbf{Nhà máy Long An:} Quy mô khoảng 600 nhân viên.
+\end{itemize}
+Hiện tại, công ty đang gặp thách thức lớn trong việc quản lý và kiểm soát nhân viên ra vào nơi làm việc, đồng thời quy trình tổng hợp dữ liệu chấm công hằng tháng để tính lương vẫn còn nhiều công đoạn thủ công, chưa được tự động hóa triệt để. Qua phân tích hiện trạng vận hành và bối cảnh doanh nghiệp, các vấn đề cốt lõi được xác định như sau:
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{1.5cm}|m{4.2cm}|m{10cm}|}
+    \caption{Danh sách các vấn đề và hiện trạng tại TMC}\label{tab:problems-current-state}\\
+    \hline
+    \textbf{ID} & \textbf{Vấn đề} & \textbf{Mô tả hiện trạng}\\
+    \hline
+    \endfirsthead
+    \multicolumn{3}{c}{\tablename\ \thetable{} -- tiếp theo}\\
+    \hline
+    \textbf{ID} & \textbf{Vấn đề} & \textbf{Mô tả hiện trạng}\\
+    \hline
+    \endhead
+    \hline
+    \multicolumn{3}{r}{(Còn tiếp)}\\
+    \endfoot
+    \hline
+    \endlastfoot
+    P-01 & Ùn tắc tại cổng ra vào vào giờ cao điểm & Vào đầu và cuối ca làm việc, nhiều nhân viên đồng thời ra vào nhà máy, gây áp lực lên quy trình xác thực tại điểm chấm công, tiềm ẩn nguy cơ ùn tắc và ảnh hưởng đến thời gian làm việc.\\
+    \hline
+    P-02 & Rủi ro thất thoát và sai lệch dữ liệu chấm công & Việc tổng hợp dữ liệu chấm công hằng tháng còn nhiều công đoạn thủ công, làm tăng khối lượng công việc và thời gian xử lý của bộ phận nhân sự.\\
+    \hline
+    P-03 & Phụ thuộc vào hệ thống HR/Payroll hiện có & Dữ liệu chấm công cần được chuyển sang hệ thống HR/Payroll để đối soát, khiến quy trình quản lý chấm công phụ thuộc vào khả năng trao đổi dữ liệu giữa các hệ thống.\\
+    \hline
+    P-04 & Thiếu cơ chế giám sát và cảnh báo thời gian thực & Ban điều hành và Giám sát sản xuất chưa có công cụ theo dõi quân số hiện diện thực tế theo thời gian thực tại từng nhà máy để phục vụ điều phối ca sản xuất.\\
+    \hline
+    P-05 & Khó khăn trong quản lý tập trung tại nhiều nhà máy & Công ty vận hành hai nhà máy với tổng quy mô khoảng 1.400 nhân viên, đặt ra nhu cầu quản lý dữ liệu chấm công và kiểm soát ra vào nhất quán giữa các địa điểm.\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsection{Mục tiêu dự án}
+Dự án hướng đến xây dựng hệ thống quản lý chấm công và kiểm soát ra vào bằng mã QR cho Công ty Cổ phần Sản xuất TMC, nhằm tự động hóa quy trình ghi nhận dữ liệu chấm công, nâng cao hiệu quả quản lý nhân sự và hỗ trợ công tác vận hành tại hai nhà máy. Các mục tiêu cụ thể bao gồm:
+
+\begin{itemize}
+\item \textbf{OBJ-01 -- Tự động hóa chấm công và kiểm soát ra vào:} Cho phép nhân viên sử dụng mã QR để thực hiện chấm công và ra vào nhà máy thông qua cổng xoay.
+\item \textbf{OBJ-02 -- Quản lý dữ liệu chấm công tập trung:} Lưu trữ và quản lý thống nhất dữ liệu chấm công của nhân viên tại hai nhà máy, hỗ trợ tra cứu và đối soát khi cần.
+\item \textbf{OBJ-03 -- Đơn giản hóa quy trình đối soát chấm công:} Hỗ trợ tổng hợp và trao đổi dữ liệu chấm công với hệ thống HR/Payroll hiện có, giảm thao tác xử lý thủ công.
+\item \textbf{OBJ-04 -- Nâng cao khả năng giám sát nhân sự:} Cung cấp thông tin và báo cáo chấm công để các bộ phận liên quan theo dõi tình hình ra vào và hiện diện của nhân viên.
+\item \textbf{OBJ-05 -- Đảm bảo an toàn và minh bạch dữ liệu:} Kiểm soát quyền truy cập, hỗ trợ truy vết các hoạt động trên hệ thống và bảo vệ thông tin cá nhân của nhân viên.
+\end{itemize}
+
+\subsection{Ràng buộc, giả định và rủi ro}
+
+\subsubsection{Ràng buộc}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{1.3cm}|>{\raggedright\arraybackslash}m{3cm}|>{\raggedright\arraybackslash}m{11.5cm}|}
+    \caption{Các ràng buộc của hệ thống}\label{tab:system-constraints}\\
+    \hline
+    \textbf{ID} & \textbf{Phân loại} & \textbf{Mô tả}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{ID} & \textbf{Phân loại} & \textbf{Mô tả}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{C-01} & Kỹ thuật & Hệ thống phải tích hợp với hệ thống kiểm soát cổng xoay và hệ thống nhân sự - tiền lương (HR/Payroll) hiện có thông qua các API được hỗ trợ.\\
+    \hline
+    \textbf{C-02} & Nghiệp vụ & Dữ liệu chấm công phải được truyền đến hệ thống nhân sự - tiền lương và sẵn sàng đối soát trước 12:00 trưa ngày đầu tiên của mỗi tháng.\\
+    \hline
+    \textbf{C-03} & Pháp lý & Hệ thống phải tuân thủ các quy định hiện hành về bảo vệ dữ liệu cá nhân, đồng thời bảo vệ thông tin cá nhân và dữ liệu chấm công của nhân viên khỏi việc truy cập hoặc tiết lộ trái phép.\\
+    \hline
+    \textbf{C-04} & Phạm vi triển khai & Hệ thống phải được triển khai tại cả hai nhà máy của TMC: Bình Dương với khoảng 800 nhân viên và Long An với khoảng 600 nhân viên.\\
+    \hline
+    \textbf{C-05} & Phạm vi dự án & Hệ thống bao gồm ghi nhận chấm công bằng mã QR, kiểm soát ra vào, quản lý dữ liệu chấm công và tích hợp dữ liệu với hệ thống nhân sự - tiền lương. Quản lý khách tham quan và tính toán lương nằm ngoài phạm vi dự án.\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Giả định}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{1.3cm}|>{\raggedright\arraybackslash}m{3cm}|>{\raggedright\arraybackslash}m{11.5cm}|}
+    \caption{Các giả định của hệ thống}\label{tab:system-assumptions}\\
+    \hline
+    \textbf{ID} & \textbf{Phân loại} & \textbf{Mô tả}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{ID} & \textbf{Phân loại} & \textbf{Mô tả}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{A-01} & Tích hợp hệ thống & Hệ thống kiểm soát cổng xoay hiện có cung cấp các giao diện tích hợp cho phép gửi lệnh mở hoặc đóng cổng và nhận kết quả thực hiện tương ứng.\\
+    \hline
+    \textbf{A-02} & Truy cập mã QR & Giả định TMC đã có Cổng thông tin nhân viên (TMC Employee Portal) và cổng thông tin này có thể được tích hợp với hệ thống mới để hiển thị mã QR cá nhân. Khả năng hiện tại và giao diện tích hợp của cổng thông tin cần được xác nhận.\\
+    \hline
+    \textbf{A-03} & API tích hợp & Tài liệu API của hệ thống kiểm soát cổng xoay và hệ thống nhân sự - tiền lương cung cấp đủ thông tin để xác định yêu cầu tích hợp, bao gồm định dạng dữ liệu, cơ chế xác thực và phản hồi lỗi.\\
+    \hline
+    \textbf{A-04} & Hiệu năng thiết bị & API của hệ thống kiểm soát cổng xoay phản hồi lệnh mở cổng trong tối đa 500 ms khi được gọi trong mạng LAN của nhà máy.\\
+    \hline
+    \textbf{A-05} & Hạ tầng & Phần xử lý tập trung của hệ thống được triển khai tại trung tâm dữ liệu (on-premise) của TMC; hai nhà máy kết nối về trung tâm qua đường truyền WAN được mã hóa (VPN site-to-site).\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Rủi ro}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{1.3cm}|>{\raggedright\arraybackslash}m{3.8cm}|>{\raggedright\arraybackslash}m{8.5cm}|>{\centering\arraybackslash}m{1.8cm}|}
+    \caption{Các rủi ro của hệ thống}\label{tab:system-risks}\\
+    \hline
+    \textbf{ID} & \textbf{Rủi ro} & \textbf{Mô tả} & \textbf{Mức độ ảnh hưởng}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{ID} & \textbf{Rủi ro} & \textbf{Mô tả} & \textbf{Mức độ ảnh hưởng}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{R-01} & Lưu lượng truy cập tăng cao vào giờ giao ca & Nhiều nhân viên có thể quét mã QR trong khoảng thời gian ngắn vào giờ giao ca, làm tăng tải xử lý và khiến thời gian phản hồi của kiosk vượt quá 2 giây. & Cao\\
+    \hline
+    \textbf{R-02} & Mất kết nối mạng & Sự cố mạng giữa các trạm cổng và hệ thống trung tâm có thể khiến việc xác thực mã QR không thực hiện được hoặc làm chậm quá trình ghi nhận và đồng bộ dữ liệu chấm công. & Cao\\
+    \hline
+    \textbf{R-03} & API của hệ thống nhân sự - tiền lương không khả dụng & Hệ thống nhân sự - tiền lương có thể tạm thời không khả dụng khi truyền dữ liệu chấm công, dẫn đến nguy cơ không đáp ứng thời hạn đối soát hằng tháng. & Cao\\
+    \hline
+    \textbf{R-04} & Chấp nhận mã QR không hợp lệ hoặc đã bị thu hồi & Trạng thái mã QR có thể không còn cập nhật nếu hệ thống sử dụng dữ liệu lưu đệm, dẫn đến nguy cơ chấp nhận mã QR không hợp lệ hoặc đã bị thu hồi để truy cập. & Cao\\
+    \hline
+    \textbf{R-05} & Không nhất quán dữ liệu chấm công & Cổng có thể mở thành công nhưng sự kiện chấm công tương ứng không được ghi nhận, hoặc các yêu cầu gửi lại có thể tạo ra bản ghi chấm công trùng lặp. & Cao\\
+    \hline
+    \textbf{R-06} & Mã QR tĩnh bị lộ hoặc bị phát lại & Nếu mã QR không thay đổi theo thời gian, ảnh chụp mã QR có thể bị chia sẻ hoặc sử dụng lại để người khác ra vào nhà máy hoặc chấm công hộ, gây mất an ninh và sai lệch dữ liệu chấm công. & Cao\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsection{Phạm vi hệ thống}
+\subsubsection{Ranh giới phạm vi triển khai}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\raggedright\arraybackslash}m{2.8cm}|>{\raggedright\arraybackslash}m{6.1cm}|>{\raggedright\arraybackslash}m{6.3cm}|}
+    \caption{Ranh giới phạm vi triển khai của hệ thống TMC}\label{tab:tmc-scope}\\
+    \hline
+    \textbf{Hạng mục} & \textbf{Trong phạm vi (In-Scope)} & \textbf{Ngoài phạm vi (Out-of-Scope) và lý do loại trừ}\\
+    \hline
+    Quản lý nhân viên và QR & Tiếp nhận thông tin nhân viên; quản lý mã QR, trạng thái QR và quyền sử dụng QR để chấm công. & Không quản lý toàn bộ hồ sơ nhân sự và vòng đời nhân viên. HR/Payroll tiếp tục là hệ thống quản lý dữ liệu nhân sự chính thức.\\
+    \hline
+    Trạm cổng và kiểm soát ra vào & Quản lý thông tin trạm cổng; xác thực QR và tích hợp API cổng xoay để điều khiển ra vào; theo dõi kết quả lệnh và xử lý lỗi tích hợp. & Không bảo trì, sửa chữa phần cứng cổng xoay và thiết bị quét QR. Đây là trách nhiệm của đơn vị cung cấp hoặc bảo trì phần cứng.\\
+    \hline
+    Ghi nhận và quản lý chấm công & Ghi nhận, lưu trữ và tra cứu sự kiện vào/ra; quản lý dữ liệu chấm công phục vụ tổng hợp và đối soát. & Không tính toán bảng lương hoặc xử lý nghiệp vụ trả lương. Hệ thống TMC chỉ cung cấp dữ liệu chấm công; HR/Payroll đảm nhận nghiệp vụ tính lương.\\
+    \hline
+    Báo cáo và giám sát & Tra cứu lịch sử ra/vào; tổng hợp báo cáo chấm công theo nhân viên, thời gian và nhà máy; hỗ trợ theo dõi tình hình hiện diện. & Không xây dựng báo cáo tài chính hoặc báo cáo hiệu suất sản xuất không liên quan đến chấm công, vì các nội dung này không thuộc mục đích chính của hệ thống.\\
+    \hline
+    Tích hợp HR/Payroll & Truyền dữ liệu chấm công qua API; theo dõi kết quả truyền, xử lý lỗi và hỗ trợ gửi lại dữ liệu chưa được tiếp nhận. & Không thay thế hoặc triển khai lại HR/Payroll, cũng không trực tiếp tính lương. Phạm vi này tận dụng hệ thống HR/Payroll hiện có và giới hạn trách nhiệm của TMC ở dữ liệu chấm công.\\
+    \hline
+    Đồng bộ dữ liệu nhân viên & Tiếp nhận dữ liệu nhân viên từ hệ thống nguồn và cập nhật thông tin cần thiết cho xác thực, chấm công. & Không thay đổi hoặc quản lý dữ liệu nhân sự gốc trong HR/Payroll, nhằm tránh trùng lặp trách nhiệm quản lý dữ liệu giữa các hệ thống.\\
+    \hline
+    Quản trị, phân quyền và kiểm toán & Quản lý tài khoản, vai trò và quyền truy cập; ghi nhật ký hoạt động cần kiểm toán; bảo vệ dữ liệu cá nhân. & Không quản trị toàn bộ tài khoản và quyền truy cập của các hệ thống doanh nghiệp khác; hệ thống TMC chỉ quản lý người dùng và quyền hạn thuộc phạm vi của mình.\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Ranh giới với các hệ thống bên ngoài}
+
+Hệ thống TMC được xác định là hệ thống trung tâm chịu trách nhiệm quản lý chấm công và kiểm soát ra vào của nhân viên tại hai nhà máy. Ranh giới giữa TMC và các hệ thống liên quan được xác định như sau:
+
+\begin{itemize}
+    \item \textbf{Hệ thống điều khiển cổng xoay:} Chịu trách nhiệm tiếp nhận yêu cầu điều khiển từ TMC thông qua API và thực hiện điều khiển cổng xoay. TMC chịu trách nhiệm xử lý nghiệp vụ xác thực và gửi yêu cầu mở cổng; hệ thống cổng xoay chịu trách nhiệm điều khiển thiết bị theo giao diện tích hợp hiện có.
+    \item \textbf{Hệ thống HR/Payroll:} Là hệ thống nhân sự và tiền lương hiện có. TMC gửi dữ liệu chấm công qua API để phục vụ đối soát và tính lương. HR/Payroll đồng thời là nguồn dữ liệu nhân sự chính thức: TMC tiếp nhận và đồng bộ thông tin nhân viên (mã nhân viên, họ tên, nhà máy, bộ phận, trạng thái làm việc) từ HR/Payroll để phục vụ xác thực và quản lý QR, không tự tạo hoặc thay đổi dữ liệu nhân sự gốc.
+    \item \textbf{TMC Employee Portal:} Cổng thông tin web hiện có dành cho nhân viên TMC, đóng vai trò là kênh truy cập các thông tin và chức năng phục vụ nhân viên. Trong phạm vi dự án, portal được giả định sẽ tích hợp với hệ thống chấm công và kiểm soát ra vào thông qua API để lấy và hiển thị mã QR cá nhân phục vụ chấm công cho nhân viên đã đăng nhập.
+\end{itemize}
+
+\subsection{Các bên liên quan (Stakeholders)}
+
+\begin{itemize}
+    \item \textbf{Nhân viên:} Là người lao động tại hai nhà máy Bình Dương và Long An, sử dụng mã QR cá nhân để ghi nhận lượt vào và ra tại các trạm cổng, phục vụ theo dõi thời gian làm việc. Nhân viên quan tâm đến tốc độ quét mã, khả năng truy cập mã QR khi cần, độ chính xác của dữ liệu chấm công và việc hạn chế ùn tắc tại cổng, đặc biệt vào giờ cao điểm.
+    \item \textbf{Giám sát sản xuất:} Là người phụ trách và theo dõi tình hình nhân sự trong các ca làm việc của bộ phận sản xuất mình quản lý. Thông tin hiện diện giúp họ đánh giá tình hình nhân lực và điều phối ca sản xuất; do đó, họ cần dữ liệu chấm công chính xác, kịp thời và chỉ được truy xuất dữ liệu của nhân viên thuộc bộ phận mình phụ trách.
+    \item \textbf{Nhân viên HR:} Là nhân sự khai thác dữ liệu chấm công và phối hợp đối soát với hệ thống HR/Payroll hiện có. Họ cần dữ liệu vào/ra đầy đủ, chính xác, dễ truy xuất và tổng hợp; dữ liệu phải sẵn sàng trước 12:00 trưa ngày đầu tiên mỗi tháng, đồng thời hạn chế tối đa việc mất hoặc sai lệch bản ghi.
+    \item \textbf{Bảo vệ:} Là nhân sự giám sát hoạt động ra vào tại các cổng nhà máy, theo dõi trạng thái trạm cổng và hỗ trợ xử lý tình huống bất thường. Họ cần trạng thái cổng rõ ràng, khả năng phát hiện sự cố kịp thời và quy trình xử lý ngoại lệ phù hợp để bảo đảm an toàn ra vào.
+    \item \textbf{Quản trị viên hệ thống:} Chịu trách nhiệm quản lý và duy trì cấu hình kỹ thuật của TMC, bao gồm tài khoản, quyền truy cập và các thiết lập vận hành. Mối quan tâm chính là khả năng quản trị thuận tiện, theo dõi tình trạng hoạt động, bảo mật và kiểm soát quyền truy cập, cũng như duy trì hệ thống ổn định và liên tục.
+    \item \textbf{Ban lãnh đạo \& điều hành:} Theo dõi hoạt động và đưa ra quyết định quản lý; sử dụng báo cáo tổng hợp về chấm công và hoạt động ra vào để đánh giá tình hình hiện diện của nhân viên. Họ quan tâm đến độ tin cậy của dữ liệu, khả năng tổng hợp thông tin phù hợp và giá trị của thông tin đối với việc giám sát, đánh giá và ra quyết định.
+    \item \textbf{Đội vận hành IT:} Tham gia triển khai môi trường, vận hành hạ tầng, theo dõi hệ thống, xử lý sự cố và bảo trì theo phân công. Đội ngũ này quan tâm đến khả năng triển khai thuận tiện, tính dễ bảo trì và giám sát, khả năng phát hiện lỗi và phục hồi sau sự cố, cũng như mức độ phù hợp với hạ tầng công nghệ hiện có.
+    \item \textbf{Bộ phận An ninh thông tin và Tuân thủ:} Theo dõi các yêu cầu về bảo mật thông tin, bảo vệ dữ liệu và tuân thủ quy định liên quan của công ty. Bộ phận này quan tâm đến việc bảo vệ dữ liệu cá nhân, phân quyền theo trách nhiệm, ghi nhật ký kiểm toán đầy đủ và hỗ trợ truy vết, kiểm tra, giải trình khi cần.
+\end{itemize}
+

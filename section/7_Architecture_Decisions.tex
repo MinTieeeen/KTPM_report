@@ -1,0 +1,427 @@
+\section{Quyết định kiến trúc hệ thống}
+Mục này thiết lập bộ khung quy tắc kỹ thuật mang tính ràng buộc bắt buộc nhằm định hình và kiểm soát toàn bộ quá trình xây dựng, tiến hóa và bảo trì hệ thống TMC.
+
+\subsection{Bảng tổng hợp quyết định kiến trúc}
+
+\begin{table}[H]
+\centering
+\caption{Tổng hợp quyết định kiến trúc}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{1.8cm}|>{\raggedright\arraybackslash}p{6.2cm}|>{\centering\arraybackslash}p{2.0cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Mã ADR} & \textbf{Tiêu đề quyết định} & \textbf{Trạng thái} & \textbf{NFR / QAS / Ràng buộc liên quan} \\
+\hline
+ADR-01 & Lựa chọn mô hình Hybrid Edge-Central Deployment Topology & Accepted & NFR-01 (Performance), NFR-07 (Availability), NFR-10 (Offline Autonomy) \\
+\hline
+ADR-02 & Quy trình xác thực QR Code tại biên dựa trên Local In-Memory \& SQLite Allowlist & Accepted & NFR-01 (Tốc độ $\le$ 2s), OBJ-01, P-01 (Ùn tắc đổi ca) \\
+\hline
+ADR-03 & Đảm bảo giao dịch chấm công lưu bền vững và đồng bộ bằng Transactional Outbox & Accepted & NFR-02 (Zero Data Loss), OBJ-02, INV-05, INV-06 \\
+\hline
+ADR-04 & Lựa chọn Architecture Style: Modular Monolith kết hợp Edge Microkernel & Accepted & C5 (Chi phí/Vận hành), C6 (Năng lực nhóm), C7 (Modifiability) \\
+\hline
+ADR-05 & Cơ chế phân ranh giới Component và giao tiếp bất đồng bộ qua Sync Contract & Accepted & NFR-02, NFR-09, DP-04, DP-05 \\
+\hline
+ADR-06 & Cơ chế tích hợp Turnstile API và HR/Payroll API qua Ports \& Adapters và Circuit Breaker & Accepted & C-01, C-02, NFR-03 (Hạn 12:00 ngày 1), NFR-09 \\
+\hline
+ADR-07 & Chiến lược tổ chức mã nguồn Monorepo, Package-by-Feature và Kiểm thử kiến trúc tự động & Accepted & NFR-08 (Scalability cấu hình), Cohesion/Coupling, DP-06 \\
+\hline
+ADR-08 & Kiểm soát truy cập RBAC, Audit Log bất biến và Bảo vệ dữ liệu cá nhân (Privacy-by-Design) & Accepted & C-03 (Nghị định BV DLCN), NFR-04, NFR-05, NFR-06, INV-10 \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Nội dung chi tiết các quyết định kiến trúc}
+
+\subsubsection*{ADR-01 — Lựa chọn mô hình Hybrid Edge-Central Deployment Topology}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Structure / Topology
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống TMC phục vụ 2 nhà máy quy mô 1.400 công nhân (Bình Dương: 800, Long An: 600). Giờ cao điểm đổi ca diễn ra với mật độ 800 lượt quẹt trong 30 phút ($\sim$0.44 tx/s trung bình, đỉnh tức thời 2--5 tx/s mỗi nhà máy). NFR-01 yêu cầu thời gian từ lúc quét QR đến khi hiển thị kết quả và phát lệnh mở cổng xoay phải $\le$ 2 giây. Đường truyền mạng Internet giữa các nhà máy và trung tâm điện toán có nguy cơ chập chờn hoặc gián đoạn (R-02). Nếu chọn mô hình Pure Cloud (tập trung toàn bộ), việc đứt cáp quang sẽ làm tê liệt toàn bộ cổng ra vào, gây ùn ứ nghiêm trọng và đình trệ sản xuất, vi phạm cam kết sẵn sàng 99.5\% (NFR-07). Nếu chọn mô hình On-premise độc lập hoàn toàn tại từng nhà máy, chi phí phần cứng và vận hành sẽ tăng gấp đôi, đồng thời gây khó khăn lớn cho việc tổng hợp dữ liệu đối soát trước 12:00 ngày 01 hằng tháng (C-02).
+
+\noindent\textbf{2. Quyết định}
+
+Nhóm quyết định áp dụng mô hình Hybrid Edge-Central Topology:
+\begin{enumerate}
+    \item Triển khai phân tán tại Biên (Edge): Mỗi trạm cổng hoặc cụm cổng tại nhà máy được trang bị một máy tính công nghiệp (Kiosk Node) thực thi runtime Gate Agent (Q1), sở hữu CSDL cục bộ lưu danh sách QR hợp lệ (Allowlist) và kho đệm giao dịch (Outbox). Toàn bộ luồng xác thực và điều khiển mở cổng được thực thi 100\% tại mạng nội bộ nhà máy mà không phụ thuộc vào đường truyền WAN.
+    \item Triển khai tập trung (Central): Toàn bộ logic quản lý nhân viên, cấp phát mã QR, tổng hợp báo cáo tháng, kiểm toán và kết nối API với HR/Payroll (Central Quantum - Q2) được đặt tập trung trên hạ tầng Cloud / Trung tâm dữ liệu của công ty.
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Đảm bảo tính độc lập vận hành (Autonomy): Cổng xoay tiếp tục mở bình thường khi đứt mạng Internet kết nối về trung tâm (NFR-10).
+        \item Giảm thiểu tối đa độ trễ mạng: Toàn bộ tác vụ quét mã và phát lệnh mở cổng nằm trọn trong mạng LAN ($\le$ 5ms), dễ dàng đáp ứng chỉ tiêu phản hồi $\le$ 2 giây.
+        \item Tối ưu chi phí hạ tầng máy chủ trung tâm: Tải quét QR được san phẳng tại các node biên, máy chủ trung tâm chỉ tiếp nhận các đợt đồng bộ lô nhẹ nhàng.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Tăng độ phức tạp quản lý: Phải duy trì cơ chế triển khai, cập nhật phần mềm từ xa (OTA/Ansible) cho các thiết bị Edge tại nhà máy.
+        \item Nhất quán cuối cùng (Eventual Consistency): Thay đổi trạng thái mã QR (thu hồi/cấp mới) tại trung tâm không có hiệu lực tức thì tại cổng mà có độ trễ lan truyền tối đa 60 giây (INV-02).
+        \item Rủi ro an ninh vật lý: Thiết bị Kiosk đặt tại hiện trường tiềm ẩn nguy cơ bị can thiệp phần cứng, đòi hỏi phải mã hóa ổ cứng và CSDL cục bộ.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Pure Cloud (Tập trung toàn bộ trên Cloud) — Bị loại vì phụ thuộc hoàn toàn vào đường truyền Internet WAN; nếu rớt mạng, công nhân không thể qua cổng (vi phạm NFR-07, R-02).
+    \item Phương án B: Completely Decentralized (Cài đặt hệ thống độc lập tại mỗi nhà máy) — Bị loại vì gây phân mảnh dữ liệu, chi phí bảo trì và cấp phép phần mềm cao, rất phức tạp khi cần đối soát dữ liệu tập trung với HR/Payroll.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-02 — Quy trình xác thực QR Code tại biên dựa trên Local In-Memory \& SQLite Allowlist}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Performance / Security / Edge Processing
+\end{itemize}
+
+\noindent\textbf{1. Context}
+
+Thời điểm giao ca, lượng công nhân dồn ứ cục bộ tại các cổng xoay có thể đạt đỉnh 2--5 giao dịch/giây trên một trạm. Trong ngân sách 2 giây (NFR-01), bộ điều khiển cổng xoay vật lý đã tiêu tốn tối đa 500ms (A-03), thời gian quét quang học của camera mất khoảng 200--300ms. Do đó, ngân sách thời gian xử lý phần mềm của hệ thống TMC chỉ còn lại khoảng 1.000ms -- 1.200ms. Luồng xử lý phần mềm phải bao gồm: giải mã token QR, kiểm tra chữ ký số/tính hợp lệ, tra cứu trạng thái nhân viên, kiểm tra vi phạm anti-passback (INV-04), ghi nhận giao dịch xuống đĩa cứng và phát lệnh điều khiển.
+
+\noindent\textbf{2. Quyết định}
+
+Xây dựng cơ chế xác thực mã QR thuần túy dựa trên dữ liệu cục bộ tại Kiosk theo kiến trúc đa tầng (Multi-tier Verification):
+\begin{enumerate}
+    \item QR Token Format: Mã QR chứa định dạng chuỗi token được ký số (HMAC-SHA256 hoặc Ed25519) gồm: EmployeeID:CredentialUUID:Timestamp:Signature. Khóa bí mật (Secret Key) để verify chữ ký được cấu hình an toàn trên Gate Agent.
+    \item Local Allowlist Cache: Gate Agent duy trì một bảng danh sách mã QR hợp lệ trong bộ nhớ RAM (In-Memory Lookup Map) và đồng bộ ánh xạ từ CSDL SQLite cục bộ (G3). Danh sách này chứa khoảng 1.400 bản ghi (tương đương dung lượng $<$ 2MB RAM).
+    \item Quy trình xác thực:
+    \begin{itemize}
+        \item Bước 1: Máy quét đọc chuỗi $\rightarrow$ G1 kiểm tra format và verify chữ ký số (mất $<$ 5ms, không cần gọi I/O).
+        \item Bước 2: Tra cứu CredentialUUID trong In-Memory Cache: Kiểm tra xem mã có ở trạng thái ACTIVE hay không.
+        \item Bước 3: Tra cứu trạng thái Anti-passback cục bộ của nhà máy (INV-04) lưu trong SQLite.
+        \item Bước 4: Ra quyết định (Cho phép / Từ chối).
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Tốc độ xác thực cực nhanh: Thời gian đưa ra quyết định xác thực $<$ 20ms, giải phóng gần như toàn bộ ngân sách thời gian cho thao tác I/O lưu trữ bền vững và điều khiển cổng xoay.
+        \item Chống làm giả mã QR: Chữ ký số mã hóa đảm bảo mã QR không thể bị giả lập hoặc tự tạo bởi người dùng trái phép.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Tốn bộ nhớ cục bộ trên thiết bị Kiosk (tuy nhiên 2MB RAM là hoàn toàn không đáng kể so với dung lượng 4GB RAM của Kiosk).
+        \item Vấn đề đồng bộ khóa bí mật: Khi cần xoay vòng khóa (Key Rotation), phải có cơ chế phân phối khóa an toàn từ trung tâm xuống các Kiosk.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Dynamic QR với TOTP (Time-based One Time Password) — Mã QR tự đổi mỗi 30 giây trên smartphone. Bị loại vì làm tăng độ trễ xác thực, đòi hỏi điện thoại công nhân phải đồng bộ đồng hồ tuyệt đối và gây khó khăn khi công nhân dùng thẻ QR in cố định (A-02).
+    \item Phương án B: Truy vấn trực tiếp Central DB qua REST API mỗi lần quét — Bị loại do phụ thuộc đường truyền WAN, độ trễ không ổn định (dao động từ 100ms - 2000ms), dễ gây tắc nghẽn giờ cao điểm.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-03 — Đảm bảo giao dịch chấm công lưu bền vững và đồng bộ bằng Transactional Outbox}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Reliability / Data Integrity
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Yêu cầu NFR-02 và OBJ-02 đặt ra chỉ tiêu tuyệt đối: "Không mất bản ghi chấm công trong điều kiện hệ thống vận hành bình thường". Đồng thời, bất biến INV-05 quy định: "Giao dịch chấm công phải được lưu bền vững trước khi Kiosk phát lệnh mở cổng và báo thành công". Mặt khác, do kiến trúc phân tán giữa Edge (Q1) và Central (Q2), các sự cố đứt kết nối mạng có thể diễn ra bất kỳ lúc nào. Nếu sử dụng cơ chế ghi dữ liệu trực tiếp lên trung tâm hoặc đồng bộ không an toàn, nguy cơ mất dữ liệu chấm công khi sập nguồn hoặc đứt mạng là rất cao.
+
+\noindent\textbf{2. Quyết định}
+
+Áp dụng mẫu hình thiết kế Local Persistence First kết hợp Transactional Outbox Pattern tại các trạm cổng (Q1):
+\begin{enumerate}
+    \item Trình tự xử lý tại Biên (Gate Agent):
+    \begin{itemize}
+        \item Khi xác thực QR thành công, G1 mở một Local Database Transaction trên SQLite (G3).
+        \item Ghi đồng thời hai thực thể trong cùng một transaction: (1) Bản ghi AttendanceTransaction (với eventId UUIDv4 sinh tại chỗ) và (2) Bản ghi OutboxEvent (chứa payload giao dịch, trạng thái PENDING).
+        \item Thực hiện COMMIT transaction xuống bộ lưu trữ vật lý (SSD) với chế độ ghi đĩa an toàn (PRAGMA synchronous = FULL hoặc WAL mode với fsync).
+        \item Chỉ sau khi commit thành công, G1 mới phát lệnh gọi G2 mở cổng xoay và render giao diện báo thành công cho công nhân.
+    \end{itemize}
+    \item Trình tự đồng bộ lên Trung tâm:
+    \begin{itemize}
+        \item Thành phần Gate Sync Agent (G4) chạy nền (Background Worker), liên tục quét các bản ghi PENDING trong bảng Outbox.
+        \item Gửi dữ liệu theo từng lô (Batch) lên endpoint của Gate Sync \& Ingestion (C1) tại trung tâm qua giao thức HTTPS.
+        \item C1 thực hiện ghi dữ liệu vào Central DB một cách Idempotent dựa trên khóa chính eventId (INV-06). Nếu eventId đã tồn tại, C1 bỏ qua việc insert nhưng vẫn trả về mã HTTP 200 OK.
+        \item Sau khi nhận phản hồi xác nhận (ACK) từ C1, G4 cập nhật trạng thái bản ghi Outbox thành SYNCED hoặc xóa khỏi Outbox.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Triệt tiêu hoàn toàn rủi ro mất dữ liệu: Dù cổng xoay bị kẹt hoặc mạng WAN đứt ngay sau khi mở cổng, bản ghi chấm công đã nằm an toàn trên đĩa cứng của trạm cổng.
+        \item Đảm bảo tính nhất quán dữ liệu (At-least-once Delivery): Giao thức Outbox kết hợp cơ chế retry tự động bảo đảm dữ liệu luôn được đẩy về trung tâm khi có mạng trở lại.
+        \item Idempotency loại bỏ nguy cơ trùng lặp dữ liệu do gửi lại (NFR-02).
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Thao tác ghi đĩa an toàn (fsync) làm tiêu tốn I/O đĩa cục bộ, kéo dài thời gian xử lý thêm khoảng 30ms -- 50ms (vẫn nằm an toàn trong ngân sách cho phép).
+        \item Ổ cứng SSD của Kiosk phải xử lý chu kỳ ghi liên tục, đòi hỏi phần cứng phải sử dụng loại Industrial SSD có độ bền cao (High TBW).
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Mở cổng trước, ghi dữ liệu sau vào hàng đợi In-Memory — Bị loại vì nếu thiết bị Kiosk đột ngột mất nguồn điện ngay sau khi mở cổng, bản ghi chấm công trong RAM sẽ biến mất vĩnh viễn, vi phạm nghiêm trọng NFR-02.
+    \item Phương án B: Sử dụng Distributed Transaction (2-Phase Commit / 2PC) — Bị loại vì độ trễ mạng quá lớn, tính khả dụng kém và không hoạt động được khi mất kết nối mạng giữa trạm cổng và trung tâm.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-04 — Lựa chọn Architecture Style: Modular Monolith kết hợp Edge Microkernel}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Structure / Style
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống TMC bao gồm 7 subdomain với các yêu cầu tải và tính chất vận hành rất khác nhau. Phân tích Quantum (Mục 5.1) chỉ ra rằng hệ thống tách thành 2 Quantum vật lý bắt buộc (Q1 tại Biên và Q2 tại Trung tâm). Nhóm dự án cần lựa chọn kiểu kiến trúc (Architecture Style) để hiện thực hóa: (1) Phía trung tâm có nên chia nhỏ thành Microservices hay giữ khối Monolith? (2) Phía Gate Agent tổ chức thế nào để hỗ trợ khả năng thay đổi nhà cung cấp cổng xoay hoặc loại thiết bị quét (NFR-09)? Ràng buộc C5 và C6 yêu cầu giải pháp phải tối ưu về chi phí hạ tầng và phù hợp với năng lực triển khai của đội ngũ kỹ sư.
+
+\noindent\textbf{2. Quyết định}
+
+Nhóm quyết định áp dụng mô hình kiến trúc lai (Hybrid Architecture Style):
+\begin{enumerate}
+    \item Tại Trung tâm (Central Quantum - Q2): Áp dụng Modular Monolith Style.
+    \begin{itemize}
+        \item Toàn bộ các component trung tâm (C1 đến C9) được đóng gói và thực thi trong một đơn vị triển khai duy nhất (Single Deployment Artifact).
+        \item Ranh giới giữa các subdomain được phân rã nghiêm ngặt theo Module (Package-by-Feature). Các module sở hữu schema dữ liệu riêng biệt về mặt logic và chỉ tương tác với nhau thông qua Public Interfaces hoặc Domain Events trong tiến trình (In-process Application Events). Nghiêm cấm việc xuyên tầng hoặc truy vấn trực tiếp bảng dữ liệu của module khác.
+    \end{itemize}
+    \item Tại Trạm cổng (Gate Quantum - Q1): Áp dụng Microkernel (Plugin) Style kết hợp Ports \& Adapters.
+    \begin{itemize}
+        \item Gate Agent là một ứng dụng tinh gọn. Phần lõi (Core Kernel) chịu trách nhiệm thực thi quy trình xác thực mã QR và quản lý transaction (G1, G3, G4).
+        \item Thành phần giao tiếp phần cứng cổng xoay (G2 - Turnstile Adapter) được thiết kế như các Plugins cắm vào Kernel thông qua chuẩn giao tiếp chung (TurnstileGateway).
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Tối ưu chi phí và năng lực vận hành (C5, C6): Không phải chịu chi phí quản lý phức tạp của hạ tầng Microservices (Service Mesh, Distributed Tracing, Network Overhead).
+        \item Đảm bảo tính toàn vẹn nghiệp vụ: Các bất biến nghiệp vụ phức tạp ở trung tâm (như khóa kỳ chốt lương và sinh đợt bổ sung - INV-09) được bảo vệ bằng ACID transaction nội bộ trong một CSDL duy nhất.
+        \item Tính linh hoạt tại biên (NFR-09): Dễ dàng hoán đổi nhà cung cấp cổng xoay cơ khí mà không làm ảnh hưởng đến mã nguồn của logic xác thực G1.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Kỷ luật phát triển mã nguồn cao: Nếu thiếu cơ chế kiểm tra tự động (như ArchUnit), lập trình viên có thể vô tình tạo ra sự phụ thuộc chéo (Circular Dependency) giữa các module trong Monolith.
+        \item Triển khai toàn bộ (Monolithic Deployment): Khi nâng cấp một module ở trung tâm, phải đóng gói và khởi động lại toàn bộ tiến trình Central Application Server.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Microservices Architecture toàn phần — Bị loại vì tải của TMC rất nhỏ ($\sim$0.44 tx/s, cao điểm vài giao dịch/s). Việc phân tán thành 6--7 microservices chỉ mang lại chi phí vận hành khổng lồ, phức tạp hóa việc xử lý transaction phân tán (Saga Pattern) mà không mang lại lợi ích quy mô nào.
+    \item Phương án B: Traditional Layered Monolith (Phân tầng kỹ thuật UI-Service-DAO) — Bị loại vì gom chung toàn bộ nghiệp vụ vào một khối spaghetti, vi phạm tính độc lập của các domain và khó tái cấu trúc.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-05 — Ranh giới Component và cơ chế giao tiếp liên Quantum \& nội bộ}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Communication / Integration
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống TMC tồn tại hai dạng ranh giới giao tiếp: (1) Ranh giới vật lý giữa Gate Quantum (Q1) và Central Quantum (Q2) qua mạng WAN; (2) Ranh giới logic giữa các component bên trong Central Quantum (C1..C9). Cần xác lập quy tắc giao tiếp rõ ràng cho từng ranh giới để đảm bảo: không tạo ra khớp nối chặt (Tight Coupling), không làm nghẽn luồng quét mã tại cổng, và bảo vệ tính bất biến của dữ liệu.
+
+\noindent\textbf{2. Quyết định}
+\begin{enumerate}
+    \item Giao tiếp liên Quantum (Q1 $\Leftrightarrow$ Q2):
+    \begin{itemize}
+        \item Tuyệt đối không sử dụng lời gọi đồng bộ (Blocking Sync Call) từ Q1 lên Q2 trong luồng quẹt thẻ.
+        \item Giao tiếp giữa hai Quantum được thực hiện bất đồng bộ dựa trên hợp đồng dữ liệu chuẩn hóa (\texttt{sync-contract}) được quản lý phiên bản (Schema Versioning).
+        \item Chiều lên (Q1 $\rightarrow$ Q2): Giao dịch chấm công, nhật ký quét từ chối và bản ghi mở cổng thủ công được G4 đóng gói thành batch đẩy lên API của C1 theo giao thức HTTP REST/JSON hoặc gRPC, bảo đảm tính Idempotent bằng eventId.
+        \item Chiều xuống (Q2 $\rightarrow$ Q1): G4 định kỳ kéo (Poll-based Pull) danh sách QR cập nhật từ C1 theo cơ chế Delta Sync (dựa trên mốc thời gian lastUpdatedTimestamp), đảm bảo độ trễ lan truyền $\le$ 60 giây khi mạng bình thường (INV-02).
+    \end{itemize}
+    \item Giao tiếp nội bộ Central Quantum (In-process):
+    \begin{itemize}
+        \item Truy vấn dữ liệu: Gọi trực tiếp qua Interface công khai (Java/TypeScript Interface) được công bố trong package api của từng module.
+        \item Thông báo thay đổi trạng thái (Side Effects): Sử dụng cơ chế phát sự kiện miền trong tiến trình (In-memory Domain Events). Ví dụ: Khi C1 nhận giao dịch mới, nó bắn sự kiện TransactionRecordedEvent. Module C6 (Reporting) lắng nghe sự kiện này để cập nhật bảng Read Model tổng hợp mà C1 không cần biết sự tồn tại của C6.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Đảm bảo tính độc lập tối đa giữa các trạm cổng và trung tâm: Máy chủ trung tâm có thể tạm dừng để nâng cấp bảo trì mà không làm trạm cổng ngưng hoạt động.
+        \item Giảm độ phụ thuộc giữa các module trung tâm, dễ dàng bảo trì và viết Unit Test độc lập.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Dữ liệu báo cáo có độ trễ nhỏ (Eventual Consistency) do cơ chế Delta Sync và In-process Events.
+        \item Phải duy trì và quản lý phiên bản chặt chẽ cho module sync-contract để tránh tình trạng trạm cổng dùng phiên bản schema cũ không tương thích với máy chủ trung tâm.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Sử dụng Message Broker phân tán (RabbitMQ / Apache Kafka) — Bị loại vì với lưu lượng chỉ vài giao dịch/giây, việc triển khai và bảo trì một cụm Kafka/RabbitMQ là giải pháp quá mức cần thiết (Over-engineering), làm tăng chi phí và bề mặt rủi ro an ninh mạng.
+    \item Phương án B: Chia sẻ chung CSDL giữa Q1 và Q2 (Distributed Database) — Bị loại vì vi phạm ranh giới mạng và không thể chạy được khi đứt kết nối mạng WAN.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-06 — Cơ chế tích hợp Turnstile API và HR/Payroll API qua Ports \& Adapters và Circuit Breaker}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Integration / Fault Tolerance
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống TMC chịu hai ràng buộc tích hợp bắt buộc với các hệ thống bên thứ ba (C-01): (1) Hệ thống điều khiển cổng xoay vật lý (phần cứng turnstile); (2) Hệ thống thông tin nhân sự và tính lương (HR/Payroll). Cả hai hệ thống này đều nằm ngoài tầm kiểm soát của đội ngũ phát triển TMC. Cổng xoay có thể gặp sự cố kẹt cơ khí hoặc mất kết nối mạng LAN. Hệ thống HR/Payroll có thể bị sập do quá tải hoặc bảo trì đột xuất ngay thời điểm chốt kỳ đối soát 12:00 trưa ngày 01 hằng tháng (R-03, C-02).
+
+\noindent\textbf{2. Quyết định}
+
+Áp dụng mẫu hình thiết kế Ports and Adapters (Hexagonal Architecture) kết hợp các mẫu chịu lỗi (Fault-tolerance Patterns):
+\begin{enumerate}
+    \item Tích hợp Cổng xoay (Turnstile Integration via G2):
+    \begin{itemize}
+        \item Định nghĩa cổng trừu tượng TurnstileGateway trong Domain.
+        \item Cài đặt TurnstileAdapter cụ thể theo từng nhà cung cấp thiết bị.
+        \item Áp dụng Timeout nghiêm ngặt (Strict Timeout): Lời gọi API mở cổng được giới hạn thời gian chờ tối đa là 500ms. Nếu quá thời gian này mà không có phản hồi, kích hoạt cơ chế Timeout Exception để giao diện hiển thị cảnh báo cho bảo vệ xử lý mở cổng thủ công (FR-09).
+        \item Áp dụng Circuit Breaker: Nếu cổng xoay báo lỗi liên tiếp 5 lần, chuyển trạng thái mạch sang OPEN để ngừng gửi tín hiệu tự động, tránh treo ứng dụng Kiosk, đồng thời còi báo động tại trạm cổng được kích hoạt.
+    \end{itemize}
+    \item Tích hợp HR/Payroll :
+    \begin{itemize}
+        \item Định nghĩa cổng HrPayrollGateway trong Domain.
+        \item Áp dụng cơ chế Asynchronous Batch Export với Retry \& Exponential Backoff: C4 tạo đợt xuất (PayrollExportBatch), C5 nhận nhiệm vụ gửi đợt xuất sang HR.
+        \item Nếu API của HR bị lỗi mạng hoặc quá tải (HTTP 500/503/Timeout), C5 thực hiện gửi lại tự động theo thuật toán lùi lũy thừa (Exponential Backoff: retry sau 1m, 2m, 4m, 8m...).
+        \item Reconciliation Check: Cung cấp chức năng đối soát thủ công và gửi lại có chủ đích cho nhân viên HR trên giao diện quản trị (FR-20) nếu API của HR không thể phục hồi trước giờ G.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Bảo vệ tuyệt đối nghiệp vụ lõi: Sự cố của cổng xoay hay hệ thống HR không thể làm sập hoặc làm nghẽn tiến trình xử lý chấm công nội bộ của TMC.
+        \item Tuân thủ triệt để nguyên lý DIP và OCP: Việc thay thế nhà cung cấp cổng xoay hoặc đổi cấu trúc API của HR chỉ đòi hỏi viết thêm một Adapter mới mà không cần chỉnh sửa mã nguồn nghiệp vụ.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Khi Circuit Breaker của cổng xoay bị ngắt, việc ra vào phải phụ thuộc hoàn toàn vào sự can thiệp thủ công của bảo vệ (FR-09), đòi hỏi bảo vệ phải túc trực liên tục tại cổng vào giờ cao điểm.
+        \item Cần xây dựng thêm màn hình quản trị giám sát trạng thái truyền file HR và cơ chế cảnh báo chủ động (Alerting qua Email/SMS) khi đợt xuất HR bị trễ hạn.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Tích hợp trực tiếp (Direct Call) trong Service logic — Bị loại vì làm mã nguồn nghiệp vụ bị phụ thuộc chặt chẽ vào thư viện/API bên ngoài, vi phạm nghiêm trọng NFR-09.
+    \item Phương án B: Đồng bộ sang HR bằng cách ghi trực tiếp vào CSDL của HR (Direct Database Sharing) — Bị loại vì vi phạm ranh giới an toàn thông tin doanh nghiệp, gây rủi ro xung đột khóa và toàn vẹn dữ liệu của hệ sinh thái HR.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-07 — Chiến lược tổ chức mã nguồn Monorepo, Package-by-Feature và CI/CD}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Development View / Modifiability
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống bao gồm hai ứng dụng thực thi riêng biệt: gate-agent (chạy trên Linux Kiosk) và central-server (chạy trên máy chủ trung tâm), cùng với hợp đồng chia sẻ sync-contract. Nếu phân chia thành nhiều kho mã nguồn riêng biệt (Multi-repo), nhóm phát triển nhỏ sẽ gặp trở ngại lớn trong việc đồng bộ các thay đổi về Data Contract, kiểm thử tích hợp liên module và duy trì quy trình phát hành (C6). Ngoài ra, cấu trúc bên trong mã nguồn phải phản ánh được ranh giới Domain để ngăn chặn sự suy thoái kiến trúc (Architectural Erosion).
+
+\noindent\textbf{2. Quyết định}
+\begin{enumerate}
+    \item Chiến lược Quản lý Mã nguồn (Source Code Repository):
+    \begin{itemize}
+        \item Áp dụng mô hình Monorepo: Toàn bộ mã nguồn của Gate Agent, Central Server và Hợp đồng dữ liệu chung được quản lý trong một Git Repository duy nhất mang tên tmc-core.
+    \end{itemize}
+    \item Quy ước Tổ chức Module (Package-by-Feature):
+    \begin{itemize}
+        \item Phân chia thư mục gốc theo Feature tương ứng với danh mục Component tại Mục 6.3.
+        \item Bên trong mỗi module, áp dụng cấu trúc 4 tầng chuẩn mực: api (giao diện công khai), application (use cases điều phối), domain (thực thể, business invariant và ports), infrastructure (adapters, CSDL, giao tiếp phần cứng).
+    \end{itemize}
+    \item Quy tắc Phụ thuộc và Kiểm thử Kiến trúc:
+    \begin{itemize}
+        \item Sử dụng công cụ kiểm thử kiến trúc tự động (ví dụ ArchUnit cho Java hoặc Dependency-Cruiser cho TypeScript/Node.js) chạy trong quy trình CI (Continuous Integration).
+        \item Bất kỳ commit nào vi phạm quy tắc phụ thuộc (ví dụ: tầng Domain phụ thuộc vào Infrastructure, hoặc Module này truy vấn chéo vào dữ liệu nội bộ Module khác) sẽ làm gãy quy trình Build tự động.
+    \end{itemize}
+    \item Quản lý Cấu hình:
+    \begin{itemize}
+        \item Áp dụng nguyên tắc cấu hình ngoại vi hóa (Externalized Configuration): Toàn bộ tham số biến đổi theo nhà máy hoặc môi trường (ngưỡng timeout, thời gian lưu log, chu kỳ đồng bộ) được nạp qua Environment Variables hoặc Module C9, không viết cứng (hardcode) trong mã nguồn.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích (Lợi ích):
+    \begin{itemize}
+        \item Tinh giản quy trình CI/CD: Một pull request có thể cập nhật đồng thời cả hợp đồng đồng bộ (sync-contract), phía gửi (Gate Agent) và phía nhận (Central Server), giúp kiểm thử End-to-End dễ dàng.
+        \item Tăng tính kết dính (Cohesion cao) và giảm độ phụ thuộc (Coupling thấp), tạo điều kiện cho nhiều lập trình viên làm việc song song trên các module khác nhau mà không bị xung đột mã nguồn.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Kích thước repository tăng nhanh theo thời gian.
+        \item Cần cấu hình CI/CD thông minh (Path-based triggers) để chỉ build và test các module bị thay đổi, tránh việc sửa một dòng code ở Gate Agent làm chạy lại toàn bộ pipeline của Central Server.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Multi-repo (Mỗi component một Git repo riêng) — Bị loại vì chi phí quản lý phiên bản thư viện dùng chung quá phức tạp đối với quy mô nhóm sinh viên/dự án hiện tại.
+    \item Phương án B: Package-by-Layer (Gom tất cả Controller vào một thư mục, tất cả Service vào một thư mục) — Bị loại vì phá vỡ ranh giới domain, gây khó khăn cho việc định hình quantum và bảo vệ tính bất biến của nghiệp vụ.
+\end{itemize}
+
+\vspace{0.3cm}
+\subsubsection*{ADR-08 — Kiểm soát truy cập RBAC, Audit Log bất biến và Bảo vệ dữ liệu cá nhân (Privacy-by-Design)}
+\begin{itemize}
+    \item Trạng thái: Accepted
+    \item Nhóm kiến trúc: Security / Privacy / Governance
+\end{itemize}
+
+\noindent\textbf{1. Bối cảnh}
+
+Hệ thống TMC xử lý thông tin cá nhân của người lao động (Họ tên, mã nhân viên, phòng ban, lịch sử ra vào nơi làm việc). Ràng buộc C-03 và NFR-06 yêu cầu hệ thống phải tuân thủ nghiêm ngặt các quy định pháp luật hiện hành về Bảo vệ dữ liệu cá nhân (như Nghị định 13/2023/NĐ-CP). Hệ thống cũng phải đối mặt với nguy cơ gian lận chấm công, can thiệp dữ liệu trái phép hoặc rò rỉ dữ liệu nhạy cảm. NFR-04 và NFR-05 đòi hỏi phải có cơ chế phân quyền tối thiểu (Least Privilege) và nhật ký kiểm toán không thể sửa xóa (Tamper-proof Audit Trail) lưu trữ tối thiểu 12 tháng.
+
+\noindent\textbf{2. Quyết định}
+
+Xây dựng giải pháp an ninh đa tầng dựa trên nguyên tắc Privacy-by-Design và Zero-Trust:
+\begin{enumerate}
+    \item Kiểm soát Truy cập dựa trên Vai trò (RBAC):
+    \begin{itemize}
+        \item Module C7 (IAM/RBAC) quản lý danh sách vai trò và phân quyền chi tiết (Permissions).
+        \item Mọi API tại máy chủ trung tâm đều bắt buộc phải xác thực thông qua JSON Web Token (JWT) có chữ ký số RSA-256. Hệ thống thực hiện kiểm tra quyền (Authorization Check) ở mức Function-level và Data-level (ví dụ: Giám sát viên chỉ được truy vấn dữ liệu của công nhân thuộc ca/phòng ban mình quản lý - INV-11).
+        \item Thiết bị Kiosk không yêu cầu đăng nhập tài khoản người dùng; quyền truy cập vào Kiosk được kiểm soát bằng định danh phần cứng (mTLS Device Certificate) và mã QR của công nhân.
+    \end{itemize}
+    \item Bảo vệ Dữ liệu Cá nhân (Privacy-by-Design):
+    \begin{itemize}
+        \item Thu thiểu hóa dữ liệu (Data Minimization): Bản sao dữ liệu lưu tại các trạm cổng (G3) chỉ bao gồm: CredentialUUID, EmployeeID, Status, và FactoryID. Tuyệt đối không lưu trữ các thông tin nhạy cảm như ngày sinh, số CCCD, tiền lương, hay số điện thoại tại bộ nhớ cục bộ của Kiosk.
+        \item Mã hóa khi lưu trữ (Encryption at Rest): CSDL SQLite trên Kiosk được mã hóa toàn bộ bằng thuật toán AES-256 (thông qua SQLCipher). CSDL Central PostgreSQL sử dụng mã hóa phân vùng ổ đĩa (TDE / dm-crypt).
+        \item Mã hóa đường truyền (Encryption in Transit): Bắt buộc sử dụng giao thức TLS 1.3 cho 100\% các kết nối mạng qua Internet hoặc LAN.
+    \end{itemize}
+    \item Nhật ký Kiểm toán Bất biến (Append-Only Audit Log):
+    \begin{itemize}
+        \item Module C8 chịu trách nhiệm ghi vết toàn bộ các hành vi trọng yếu (FR-21): đăng nhập thất bại, sửa hồ sơ nhân viên, cấp lại mã QR, mở cổng thủ công tại trạm (FR-09), và đặc biệt là thao tác điều chỉnh dữ liệu chấm công (FR-15).
+        \item Bảng audit\_log chỉ hỗ trợ thao tác INSERT, tuyệt đối không cấp quyền UPDATE hay DELETE cho bất kỳ tài khoản ứng dụng nào (kể cả tài khoản Admin). Áp dụng kỹ thuật Hash Chaining (mỗi bản ghi audit lưu mã băm SHA-256 của bản ghi trước đó) để phát hiện ngay lập tức nếu có hành vi can thiệp trực tiếp vào CSDL.
+        \item Dữ liệu audit được phân vùng theo tháng và duy trì lưu trữ trực tuyến tối thiểu 12 tháng trước khi được chuyển vào kho lưu trữ lạnh (Cold Storage Archive) theo chính sách lưu trữ (INV-10).
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{3. Hệ quả}
+\begin{itemize}
+    \item Lợi ích:
+    \begin{itemize}
+        \item Tuân thủ tuyệt đối quy định pháp luật về bảo vệ dữ liệu cá nhân (C-03), giảm thiểu tối đa rủi ro pháp lý cho doanh nghiệp.
+        \item Trong trường hợp thiết bị Kiosk tại cổng bị đánh cắp vật lý, kẻ tấn công cũng không thể đọc được dữ liệu do CSDL SQLite đã được mã hóa bằng SQLCipher.
+        \item Bản ghi Audit Log bất biến cung cấp bằng chứng pháp lý tin cậy tuyệt đối để giải quyết các khiếu nại về ngày công hoặc điều tra các hành vi mở cổng gian lận.
+    \end{itemize}
+    \item Đánh đổi:
+    \begin{itemize}
+        \item Mã hóa SQLCipher trên Kiosk làm tăng nhẹ mức độ sử dụng CPU ($\sim$5\%) và độ trễ đọc/ghi đĩa (khoảng vài mili-giây).
+        \item Kích thước bảng Audit Log tại trung tâm tăng nhanh theo thời gian, đòi hỏi DBA phải thiết lập quy trình tự động phân vùng (Table Partitioning) và sao lưu định kỳ.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{4. Phương án thay thế}
+\begin{itemize}
+    \item Phương án A: Lưu trữ Text Log thông thường (File-based logging như Log4j/Winston) — Bị loại vì file log dễ dàng bị can thiệp, chỉnh sửa hoặc xóa bởi quản trị viên hệ thống có quyền root, không đáp ứng được yêu cầu kiểm toán nghiêm ngặt của NFR-05.
+    \item Phương án B: Lưu trữ đầy đủ hồ sơ nhân viên tại Kiosk để phục vụ hiển thị tên và ảnh lên màn hình — Bị loại vì vi phạm nguyên tắc bảo vệ dữ liệu cá nhân; rủi ro rò rỉ dữ liệu khi thiết bị tại hiện trường bị xâm nhập là quá lớn. Kiosk chỉ hiển thị mã số nhân viên và trạng thái thành công/thất bại.
+\end{itemize}
