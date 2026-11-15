@@ -1,6 +1,6 @@
 \section{Thiết kế yêu cầu hệ thống}
 
-\subsection{Yêu cầu chức năng (Functional Requirements)}
+\subsection{Yêu cầu chức năng (Functional Requirements)}\label{sec:fr}
 \subsubsection{Quản lý người dùng và mã QR}
 
 \begingroup
@@ -20,11 +20,11 @@
     \endfoot
     \hline
     \endlastfoot
-    \textbf{FR-01} & Tạo, cập nhật và vô hiệu hóa hồ sơ nhân viên, bao gồm mã nhân viên, họ tên, nhà máy và bộ phận. Khi hồ sơ bị vô hiệu hóa, mã QR đang hiệu lực của nhân viên phải được thu hồi. & Nhân viên HR & Must & Security; Data Integrity\\
+    \textbf{FR-01} & Hệ thống phải tiếp nhận và đồng bộ hồ sơ nhân viên (mã nhân viên, họ tên, nhà máy, bộ phận, trạng thái làm việc) từ hệ thống HR/Payroll. Nhân viên HR có thể cập nhật thủ công khi API của HR/Payroll chưa sẵn sàng. Khi hồ sơ bị vô hiệu hóa, mã QR đang hiệu lực của nhân viên phải được thu hồi. & Hệ thống HR/Payroll; Nhân viên HR & Must & Security; Data Integrity; Interoperability\\
     \hline
-    \textbf{FR-02} & Hệ thống phải cấp mã QR duy nhất cho mỗi nhân viên đủ điều kiện sử dụng hệ thống. Tại mọi thời điểm, mỗi nhân viên chỉ được có tối đa một mã QR đang hiệu lực. & Nhân viên HR & Must & Security; Data Integrity\\
+    \textbf{FR-02} & Hệ thống phải cấp thông tin định danh QR (QR credential) duy nhất cho mỗi nhân viên đủ điều kiện sử dụng hệ thống. Tại mọi thời điểm, mỗi nhân viên chỉ được có tối đa một QR credential đang hiệu lực. Mã QR hiển thị cho nhân viên là mã động có chữ ký số và thời hạn hiệu lực ngắn, được sinh từ QR credential này. & Nhân viên HR & Must & Security; Data Integrity\\
     \hline
-    \textbf{FR-03} & Hệ thống phải tích hợp với TMC Employee Portal hiện có để nhân viên đã xác thực có thể xem và hiển thị mã QR cá nhân của mình. Nhân viên không được truy cập mã QR của người khác. & Nhân viên & Must & Security\\
+    \textbf{FR-03} & Hệ thống phải tích hợp với TMC Employee Portal hiện có để nhân viên đã xác thực có thể xem và hiển thị mã QR cá nhân của mình; Portal lấy mã QR từ hệ thống thông qua API. Nhân viên không được truy cập mã QR của người khác. & Nhân viên & Must & Security\\
     \hline
     \textbf{FR-04} & Thu hồi mã QR và cấp mã mới khi cần thiết (thiết bị hiển thị QR bị mất hoặc mã QR có nguy cơ bị lộ). & Nhân viên HR & Must & Security; Data Integrity\\
     \hline
@@ -84,11 +84,11 @@
     \endfoot
     \hline
     \endlastfoot
-    \textbf{FR-11} & Hệ thống phải quét và xác thực mã QR, kiểm tra mã còn hiệu lực, nhân viên đang hoạt động và các điều kiện chấm công đã được quy định. & Nhân viên & Must & Performance; Security\\
+    \textbf{FR-11} & Hệ thống phải quét và xác thực mã QR, kiểm tra mã còn hiệu lực, nhân viên đang hoạt động và các điều kiện chấm công đã được quy định, bao gồm chữ ký và thời hạn của mã QR, trạm cổng đang hoạt động và quy tắc chống quẹt lặp chiều (anti-passback) trong phạm vi nhà máy. & Nhân viên & Must & Performance; Security\\
     \hline
     \textbf{FR-12} & Hệ thống phải gửi yêu cầu mở cổng đến hệ thống cổng xoay thông qua API sau khi mã QR được xác thực thành công & Hệ thống TMC; Hệ thống cổng xoay & Must & Interoperability; Performance; Reliability\\
     \hline
-    \textbf{FR-13} & Hệ thống phải ghi nhận mỗi sự kiện vào/ra thành giao dịch chấm công, bao gồm mã nhân viên, giờ làm việc cố định, thời gian vào/ra, trạm cổng và trạng thái phát sinh (đi muộn/vắng/không làm đủ giờ). & Hệ thống TMC & Must & Data Integrity\\
+    \textbf{FR-13} & Hệ thống phải ghi nhận mỗi lượt vào/ra đã được hệ thống cổng xoay xác nhận mở cổng thành giao dịch chấm công, bao gồm mã nhân viên, thời điểm vào/ra, trạm cổng và hướng vào/ra. & Hệ thống TMC & Must & Data Integrity\\
     \hline
     \textbf{FR-14} & Hệ thống phải hiển thị kết quả xác thực trên thiết bị tại trạm cổng, bao gồm trạng thái chấp nhận hoặc từ chối và lý do phù hợp. & Nhân viên & Must & Performance\\
     \hline
@@ -96,7 +96,7 @@
     \hline
     \textbf{FR-16} & Hệ thống phải cho phép điều chỉnh giao dịch chấm công khi có sai sót. Mỗi thao tác phải ghi nhận người thực hiện, thời điểm, lý do và thông tin thay đổi & Nhân viên HR & Should & Data Integrity; Auditability\\
     \hline
-    \textbf{FR-17} & Khi mất kết nối với hệ thống trung tâm, trạm cổng vẫn phải có khả năng xác thực QR và lưu giao dịch tại chỗ và được đồng bộ lên hệ thống khi kết nối được khôi phục. & Hệ thống TMC; Trạm cổng & Must & Availability; Reliability; Data Integrity\\
+    \textbf{FR-17} & Khi mất kết nối với hệ thống trung tâm, trạm cổng vẫn phải có khả năng xác thực QR và lưu giao dịch tại chỗ trong ngưỡng thời gian mất kết nối được cấu hình; giao dịch được đồng bộ lên hệ thống khi kết nối được khôi phục. Khi thời gian mất kết nối vượt ngưỡng, chiều vào chỉ được mở thủ công bởi bảo vệ được ủy quyền, chiều ra luôn được phép. & Hệ thống TMC; Trạm cổng & Must & Availability; Reliability; Data Integrity\\
     \hline
 \end{longtable}
 \endgroup
@@ -120,11 +120,11 @@
     \endfoot
     \hline
     \endlastfoot
-    \textbf{FR-18} & Hệ thống phải cho phép nhân viên HR tạo và tra cứu báo cáo chấm công theo ngày, tháng, nhân viên, bộ phận và nhà máy dựa trên dữ liệu chấm công đã ghi nhận. & Nhân viên HR & Must & Data Integrity\\
+    \textbf{FR-18} & Hệ thống phải cho phép nhân viên HR tạo và tra cứu báo cáo chấm công theo ngày, tháng, nhân viên, bộ phận và nhà máy dựa trên dữ liệu chấm công đã ghi nhận, kèm các chỉ tiêu dẫn xuất (đi muộn, về sớm, vắng, không làm đủ giờ) được tính theo lịch làm việc cố định đã cấu hình. & Nhân viên HR & Must & Data Integrity\\
     \hline
-    \textbf{FR-19} & Hệ thống cho phép quản lý tra cứu thông tin chấm công của các nhân viên thuộc bộ phận phụ trách, bảo đảm người dùng chỉ truy cập dữ liệu được phân quyền. & Quản lý & Should & Security\\
+    \textbf{FR-19} & Hệ thống cho phép giám sát sản xuất tra cứu thông tin chấm công của các nhân viên thuộc bộ phận phụ trách, bảo đảm người dùng chỉ truy cập dữ liệu được phân quyền. & Giám sát sản xuất & Should & Security\\
     \hline
-    \textbf{FR-20} & Hệ thống phải cung cấp báo cáo tổng hợp được xuất dưới dạng Excel về tình hình chấm công và hoạt động ra/vào theo nhà máy và kỳ báo cáo, phục vụ công tác giám sát và ra quyết định của ban điều hành. & Ban điều hành & Must & Performance\\
+    \textbf{FR-20} & Hệ thống phải cung cấp báo cáo tổng hợp được xuất dưới dạng Excel về tình hình chấm công và hoạt động ra/vào theo nhà máy và kỳ báo cáo, phục vụ công tác giám sát và ra quyết định của ban lãnh đạo và điều hành. & Ban lãnh đạo \& điều hành & Must & Security; Privacy\\
     \hline
     \textbf{FR-21} & Hệ thống phải tổng hợp và truyền dữ liệu chấm công theo tháng sang hệ thống HR/Payroll thông qua API & Hệ thống TMC; Hệ thống HR/Payroll & Must & Reliability; Interoperability; Data Integrity\\
     \hline
@@ -158,17 +158,42 @@
     \endlastfoot
     \textbf{FR-25} & Người dùng phải đăng nhập và được xác thực trước khi truy cập các chức năng yêu cầu quyền truy cập của hệ thống. & Người dùng & Must & Security\\
     \hline
-    \textbf{FR-26} & Quản trị viên có thể tạo, xem, cập nhật, kích hoạt và vô hiệu hóa tài khoản người dùng; đồng thời gán vai trò phù hợp cho từng tài khoản. & Quản trị viên & Must & Security\\
+    \textbf{FR-26} & Quản trị viên hệ thống có thể tạo, xem, cập nhật, kích hoạt và vô hiệu hóa tài khoản người dùng; đồng thời gán vai trò phù hợp cho từng tài khoản. & Quản trị viên hệ thống & Must & Security\\
     \hline
-    \textbf{FR-27} & Quản trị viên có thể cấu hình quyền truy cập cho từng vai trò. Hệ thống phải kiểm tra quyền trước khi cho phép thực hiện chức năng tương ứng. & Quản trị viên & Must & Security\\
+    \textbf{FR-27} & Quản trị viên hệ thống có thể cấu hình quyền truy cập cho từng vai trò. Hệ thống phải kiểm tra quyền trước khi cho phép thực hiện chức năng tương ứng. & Quản trị viên hệ thống & Must & Security\\
     \hline
-    \textbf{FR-28} & Quản trị viên có thể cấu hình lịch truyền dữ liệu chấm công sang hệ thống HR/Payroll theo chính sách vận hành đã thống nhất. & Quản trị viên & Should & --\\
+    \textbf{FR-28} & Quản trị viên hệ thống có thể cấu hình các tham số vận hành theo chính sách đã thống nhất, bao gồm lịch truyền dữ liệu chấm công sang hệ thống HR/Payroll, lịch làm việc cố định và ngưỡng thời gian mất kết nối của trạm cổng. & Quản trị viên hệ thống & Should & Reliability\\
     \hline
 \end{longtable}
 \endgroup
 
 
-\subsection{Yêu cầu phi chức năng (Non-functional requirements)}
+\subsection{Yêu cầu phi chức năng (Non-functional requirements)}\label{sec:nfr}
+
+\subsubsection{Performance -- Hiệu năng}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{3cm}|>{\raggedright\arraybackslash}m{12.9cm}|}
+    \caption{Yêu cầu phi chức năng về hiệu năng}\label{tab:nfr-performance}\\
+    \hline
+    \textbf{ID} & \textbf{Mô tả}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{ID} & \textbf{Mô tả}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{NFR-PER-01} & Thời gian từ lúc quét mã QR đến khi kiosk hiển thị kết quả chấp nhận hoặc từ chối không vượt quá 2 giây đối với 95\% lượt quét trong giờ giao ca.\\
+    \hline
+    \textbf{NFR-PER-02} & Tại mỗi nhà máy, hệ thống phải xử lý tối thiểu 800 lượt quét trong 30 phút mà vẫn đáp ứng NFR-PER-01 và không gián đoạn dịch vụ do quá tải.\\
+    \hline
+\end{longtable}
+\endgroup
 
 \subsubsection{Availability -- Tính sẵn sàng}
 \begingroup
@@ -188,8 +213,6 @@
     \endfoot
     \hline
     \endlastfoot
-    \textbf{NFR-AVL-01} & Tại mỗi nhà máy, hệ thống phải duy trì khả năng xử lý tối thiểu 800 giao dịch chấm công trong 30 phút mà không gián đoạn dịch vụ do quá tải.\\
-    \hline
     \textbf{NFR-AVL-02} & Khi xác thực QR hoặc ghi nhận chấm công gặp lỗi, kiosk phải hiển thị thông báo trạng thái trong vòng 2 giây kể từ khi phát hiện lỗi.\\
     \hline
     \textbf{NFR-AVL-03} & Khi API điều khiển cổng xoay không phản hồi, hệ thống phải hiển thị trạng thái thất bại hoặc chưa xác định trong vòng 2 giây, không thông báo mở cổng thành công khi chưa có xác nhận tương ứng.\\
@@ -250,9 +273,13 @@
     \hline
     \textbf{NFR-SEC-02} & QR hết hạn, bị thu hồi hoặc không thuộc nhân viên hợp lệ phải bị từ chối trước khi hệ thống gửi lệnh mở cổng.\\
     \hline
-    \textbf{NFR-SEC-03} & Các kết nối API qua mạng phải sử dụng TLS 1.2 trở lên và không truyền mật khẩu hoặc token xác thực dưới dạng văn bản rõ.\\
+    \textbf{NFR-SEC-03} & Các kết nối API qua mạng phải sử dụng TLS 1.2 trở lên và không truyền mật khẩu hoặc token xác thực dưới dạng văn bản rõ. Kết nối trong mạng LAN tới hệ thống cổng xoay tuân theo hợp đồng API của nhà cung cấp và được đặt trong phân vùng mạng (VLAN) cô lập.\\
     \hline
     \textbf{NFR-SEC-04} & Tài khoản đã bị vô hiệu hóa phải không thể đăng nhập hoặc tiếp tục truy cập chức năng được bảo vệ sau khi trạng thái vô hiệu hóa có hiệu lực.\\
+    \hline
+    \textbf{NFR-SEC-05} & Mã QR hiển thị cho nhân viên phải có thời hạn hiệu lực không quá 60 giây; mã QR hết hạn, sai chữ ký hoặc đã được sử dụng phải bị từ chối.\\
+    \hline
+    \textbf{NFR-SEC-06} & Việc thu hồi QR credential phải có hiệu lực tại mọi trạm cổng đang kết nối với hệ thống trung tâm trong vòng 60 giây.\\
     \hline
 \end{longtable}
 \endgroup
@@ -333,13 +360,15 @@
     \endfoot
     \hline
     \endlastfoot
-    \textbf{NFR-AUD-01} & 100\% thao tác quan trọng gồm thay đổi tài khoản/quyền, cấp hoặc thu hồi QR, điều chỉnh chấm công và truyền dữ liệu phải tạo audit log chứa người thực hiện, thời điểm, hành động và kết quả.\\
+    \textbf{NFR-AUD-01} & 100\% thao tác quan trọng gồm thay đổi tài khoản/quyền, cấp hoặc thu hồi QR, điều chỉnh chấm công, mở cổng thủ công và truyền dữ liệu phải tạo audit log chứa người thực hiện, thời điểm, hành động và kết quả.\\
     \hline
     \textbf{NFR-AUD-02} & Audit log phải hỗ trợ tìm kiếm theo khoảng thời gian, người thực hiện, loại hành động và kết quả.\\
     \hline
     \textbf{NFR-AUD-03} & Người dùng không có quyền quản trị audit log phải bị từ chối thao tác sửa hoặc xóa log.\\
     \hline
     \textbf{NFR-AUD-04} & Các trường hợp QR bị từ chối, mở cổng thất bại và API tích hợp gặp lỗi phải được ghi log kèm thời điểm, mã trạm, loại lỗi và kết quả xử lý.\\
+    \hline
+    \textbf{NFR-AUD-05} & Audit log phải được lưu trực tuyến tối thiểu 12 tháng trước khi được chuyển sang kho lưu trữ dài hạn theo chính sách lưu trữ của doanh nghiệp.\\
     \hline
 \end{longtable}
 \endgroup
@@ -394,6 +423,31 @@
     \textbf{NFR-REC-01} & Cơ sở dữ liệu chấm công phải được sao lưu ít nhất mỗi 24 giờ, đồng thời lưu trạng thái thành công hoặc thất bại của từng lần sao lưu.\\
     \hline
     \textbf{NFR-REC-02} & Dữ liệu chấm công phải có khả năng khôi phục từ bản sao lưu và giữ nguyên mã định danh, thời điểm, mã trạm và hướng vào/ra của từng giao dịch.\\
+    \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Modifiability và Scalability -- Khả năng sửa đổi và mở rộng}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\centering\arraybackslash}m{3cm}|>{\raggedright\arraybackslash}m{12.9cm}|}
+    \caption{Yêu cầu phi chức năng về khả năng sửa đổi và mở rộng}\label{tab:nfr-modifiability}\\
+    \hline
+    \textbf{ID} & \textbf{Mô tả}\\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{ID} & \textbf{Mô tả}\\
+    \hline
+    \endhead
+    \hline
+    \endfoot
+    \hline
+    \endlastfoot
+    \textbf{NFR-MOD-01} & Việc thay đổi nhà cung cấp cổng xoay hoặc thay đổi API của hệ thống HR/Payroll chỉ yêu cầu thay thế hoặc bổ sung thành phần tích hợp (adapter) tương ứng, không yêu cầu sửa đổi logic nghiệp vụ lõi.\\
+    \hline
+    \textbf{NFR-SCA-01} & Việc bổ sung trạm cổng mới hoặc nhà máy mới chỉ yêu cầu khai báo cấu hình và triển khai thêm thành phần tại nhà máy, không yêu cầu sửa đổi mã nguồn.\\
     \hline
 \end{longtable}
 \endgroup
