@@ -294,324 +294,844 @@ Security được bảo đảm như một đặc tính nền tảng: xác thực
 
 \paragraph{Liên hệ với vấn đề phát sinh.} Style được chọn giải quyết vấn đề \textit{mất kết nối} ở mức cấu trúc: Gate Agent là một đơn vị triển khai tự chủ có kho dữ liệu riêng, nên việc ra vào và ghi nhận chấm công không phụ thuộc vào đường truyền tới trung tâm; outbox bảo đảm không mất và không trùng dữ liệu khi đồng bộ lại. Đối với vấn đề \textit{mã QR tĩnh}, kiến trúc microkernel và ports and adapters của Gate Agent cho phép đặt bộ kiểm tra chữ ký và thời hạn mã QR thành một thành phần riêng trong lõi, trong khi việc ký mã QR nằm ở Central Quantum -- nơi duy nhất giữ khóa bí mật. Các quyết định này được ghi nhận chính thức trong ADR-04 và ADR-05 (Mục~\ref{sec:architecture-decisions}).
 
-\subsection{Kiến trúc logic}\label{sec:logical-architecture}
-Kiến trúc logic xác định các component của hệ thống TMC: mỗi component chịu trách nhiệm gì, đảm nhận FR nào, sở hữu dữ liệu gì và giao tiếp với nhau ra sao. Phần này chưa gắn với máy chủ hay công nghệ cụ thể; việc đặt component lên node thuộc kiến trúc vật lý (mục 6.4).
+\subsection{Xây dựng kiến trúc logic}\label{sec:logical-architecture}
+Kiến trúc logic xác định các component của hệ thống: mỗi component chịu trách nhiệm gì, đảm nhận yêu cầu chức năng nào, sở hữu dữ liệu nào và giao tiếp với các component khác ra sao. Ở mức này, component chưa được gắn với máy chủ hay công nghệ cụ thể; việc đặt component lên hạ tầng thuộc kiến trúc vật lý (Mục~\ref{sec:physical-architecture}). Kiến trúc logic được xây dựng qua năm bước: xác định component ứng viên từ subdomain; gán yêu cầu chức năng và phát hiện vấn đề; tinh chỉnh theo đặc tính kiến trúc và quantum; xác định interface và connector; kiểm chứng kết quả.
 
-Component được xác định theo ba bước:
-
-Đề xuất component ban đầu từ bảng subdomain (mục 3.3).
-
-Gán các FR (mục 2.5) cho từng component.
-
-Kiểm tra lại theo ba đặc tính ưu tiên (mục 5.2) và hai quantum (mục 6.1) để tách hoặc gộp.
-
-\subsubsection{Xác định component}
-Bước 1: Component ban đầu từ subdomain. Mỗi subdomain ở mục 3.3.2 cho một component ứng viên:
-
-Kiểm soát ra vào và ghi nhận chấm công
-
-Điều chỉnh chấm công và chốt kỳ
-
-Quản lý nhân viên và mã QR
-
-Quản lý trạm cổng
-
-Báo cáo và giám sát
-
-Tích hợp HR/Payroll và cổng xoay
-
-Xác thực, phân quyền và audit
-
-Bước 2: Gán FR. Khi gán FR-01 đến FR-26 cho bảy component ứng viên, nhóm thấy ba vấn đề:
-
-"Kiểm soát ra vào" ôm FR của cả hai quantum. Các FR quyết định tại cổng (FR-10, FR-11, FR-13) cần chạy ở Q1. Còn việc lưu trữ giao dịch phục vụ báo cáo và chốt kỳ (FR-12, FR-14) thuộc Q2.
-
-"Tích hợp" gộp hai hệ thống ngoài có cách gọi trái ngược. Cổng xoay được gọi đồng bộ ở mỗi lần quét, trong ngân sách 2 giây. HR/Payroll được gọi theo lô vào cuối tháng.
-
-FR-09 và một phần FR-08 cần chạy được ngay tại cổng khi mất kết nối. FR-09 là mở cổng thủ công; phần FR-08 liên quan là hiển thị trạng thái trạm. Trong khi đó component "Quản lý trạm cổng" lại nằm ở trung tâm.
-
-Bước 3: Kiểm tra theo đặc tính ưu tiên và quantum. Từ ba vấn đề trên, nhóm tách và gộp như sau:
-
-Tách "Kiểm soát ra vào" theo quantum (mục 6.1.3).
-
-Access Control (G1) đặt tại cổng, phục vụ Performance và Availability/Offline.
-
-Gate Sync \& Ingestion (C1) đặt ở trung tâm, phục vụ Reliability/Data Integrity.
-
-Tách "Tích hợp" thành hai adapter: Turnstile Adapter (G2, thuộc Q1) và HR/Payroll Adapter (C5, thuộc Q2), vì hai phía khác nhau cả về đặc tính lẫn quantum.
-
-Thêm hai component kỹ thuật: Local Store \& Outbox (G3) và Gate Sync Agent (G4). Hai component này không có FR riêng, nhưng bắt buộc phải có để Q1 lưu bền vững trước khi xác nhận (INV-05) và đồng bộ được với Q2 (mục 6.1.4).
-
-Thêm Guard Console (G5) tại cổng cho FR-09 và cho việc hiển thị lần quét bị từ chối, để bảo vệ vẫn thao tác được khi mất mạng.
-
-Tách "Xác thực, phân quyền và audit" thành IAM/RBAC (C7) và Audit Log (C8). Audit Log chỉ ghi thêm và có quy tắc truy cập, thời hạn lưu riêng (NFR-05, INV-10). Nó còn nhận cả bản ghi mở cổng thủ công đồng bộ lên từ Q1.
-
-Tách Configuration (C9) khỏi Quản lý trạm cổng, vì tham số hệ thống (FR-26) được nhiều module dùng chung.
-
-Giữ "Điều chỉnh chấm công và chốt kỳ" thành một component (C4). Điều chỉnh và chốt kỳ cùng chịu INV-09: sau khi khóa kỳ, điều chỉnh phải đi vào đợt bổ sung. Nếu tách hai nơi thì phải đồng bộ trạng thái kỳ giữa chúng.
-
-Không tách Báo cáo (C6) thành quantum riêng (mục 6.1.5). C6 chỉ đọc qua read model.
-
-Kết quả là 14 component, trình bày trong Bảng 6.3.1. Mọi FR từ FR-01 đến FR-26 đều có component đảm nhận. Các FR trải trên cả hai quantum (FR-08, FR-11, FR-12, FR-14) được chia thành phần phía cổng và phần phía trung tâm.
-
-\small
-\renewcommand{\arraystretch}{1.3}
-\begin{longtable}{|>{\centering\arraybackslash}p{0.8cm}|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{6.0cm}|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{2.8cm}|}
-% --- Tiêu đề duy nhất ở trang đầu ---
-\caption{Danh mục component} \label{tab:danh_muc_component} \\
-\hline
-\textbf{Mã} & \textbf{Component} & \textbf{Trách nhiệm} & \textbf{FR đảm nhận} & \textbf{Đặc tính phải đáp ứng} \\
-\hline
-\endfirsthead
-
-% --- Sang trang sau: chỉ kẻ lại tiêu đề cột (không in tiêu đề bảng) ---
-\hline
-\textbf{Mã} & \textbf{Component} & \textbf{Trách nhiệm} & \textbf{FR đảm nhận} & \textbf{Đặc tính phải đáp ứng} \\
-\hline
-\endhead
-
-\endfoot
-
-\hline
-\endlastfoot
-
-\multicolumn{5}{|l|}{\textbf{Q1 Gate Quantum: Gate Agent, mỗi nhà máy một bản}} \\
-\hline
-G1 & Access Control & Xác thực QR bằng danh sách QR hợp lệ cục bộ (QR ở trạng thái ACTIVE, nhân viên đang hoạt động); kiểm tra trạm đang bật (INV-03) và anti-passback (INV-04); quyết định cho qua; ghi giao dịch hoặc lần quét bị từ chối; hiển thị kết quả trên kiosk & FR-10, FR-11, FR-12, FR-13, FR-14 & Performance, Reliability/Data Integrity, Availability/Offline, Security \\
-\hline
-G2 & Turnstile Adapter & Gọi API cổng xoay, có timeout và circuit breaker; mỗi nhà cung cấp là một plugin & FR-11 & Performance, Availability, Interoperability \\
-\hline
-G3 & Local Store \& Outbox & Kho cục bộ bền vững, có mã hóa. Giữ bản sao danh sách QR hợp lệ và cấu hình trạm; giữ AttendanceTransaction, ScanAttempt và ManualGateOpening chờ đồng bộ (outbox) & FR-12, FR-14 & Reliability/Data Integrity, Privacy \\
-\hline
-G4 & Gate Sync Agent & Đẩy outbox lên trung tâm (giao ít nhất một lần); kéo danh sách QR hợp lệ và cấu hình trạm về (trễ $\le$ 60 giây); gửi heartbeat & FR-08 & Reliability/Data Integrity, Availability/Offline \\
-\hline
-G5 & Guard Console & Hiển thị lần quét bị từ chối và trạng thái trạm ngay tại chỗ; mở cổng thủ công, bắt buộc nhập lý do và ghi vào G3 để đồng bộ audit & FR-09, FR-10, FR-15 & Availability/Offline, Security, Auditability \\
-\hline
-\multicolumn{5}{|l|}{\textbf{Q2 Central Quantum: modular monolith}} \\
-\hline
-C1 & Gate Sync \& Ingestion & Nhận dữ liệu từ các Gate Agent, idempotent theo eventId (INV-06); lưu giao dịch bất biến; cung cấp danh sách QR hợp lệ và cấu hình cho Gate Agent & FR-12, FR-14 & Reliability/Data Integrity, Security \\
-\hline
-C2 & Employee \& QR Management & Quản lý hồ sơ nhân viên; cấp, thu hồi và cấp lại QR (INV-01); hiển thị QR qua app, web portal, email & FR-01 – FR-04 & Security, Privacy, Reliability/Data Integrity \\
-\hline
-C3 & Gate Station Management & Đăng ký, cập nhật, bật/tắt trạm; theo dõi trạng thái qua heartbeat và cảnh báo khi trạm offline & FR-06 – FR-08 & Availability, Observability, Scalability \\
-\hline
-C4 & Adjustment \& Period Closing & Điều chỉnh giao dịch có lý do, giữ bản gốc (INV-08); quản lý kỳ qua các trạng thái OPEN $\rightarrow$ CLOSED $\rightarrow$ LOCKED và các đợt MAIN, SUPPLEMENTAL (INV-09); theo dõi trạng thái truyền dữ liệu & FR-16, FR-21, FR-22 & Reliability/Data Integrity, Auditability \\
-\hline
-C5 & HR/Payroll Adapter & Gửi đợt dữ liệu sang HR/Payroll; gửi lại khi lỗi; idempotent theo mã đợt & FR-19, FR-20 & Reliability/Data Integrity, Interoperability \\
-\hline
-C6 & Reporting \& Monitoring & Read model chỉ đọc cho báo cáo tháng, lịch sử chấm công cá nhân và màn hình theo dõi; lọc dữ liệu theo phạm vi của người xem (INV-11) & FR-05, FR-18 – FR-20 & Security, Privacy \\
-\hline
-C7 & IAM / RBAC & Đăng nhập; quản lý tài khoản, vai trò, quyền; kiểm tra quyền cho mọi API & FR-25, FR-26, FR-27 & Security \\
-\hline
-C8 & Audit Log & Ghi nhật ký chỉ thêm cho các thao tác quan trọng, kể cả thao tác từ Q1; tra cứu, lọc; lưu tối thiểu 12 tháng (INV-10) & FR-23, FR-24 & Auditability, Security, Privacy \\
-\hline
-C9 & Configuration & Tham số hệ thống: lịch truyền dữ liệu HR, thời gian lưu dữ liệu, ngưỡng mất kết nối của cổng & FR-28 & Modifiability, Scalability \\
-\end{longtable}
-\normalsize
-
-\subsubsection{Sơ đồ component và cách giao tiếp}
-Hình 6.3.1 là sơ đồ component; Bảng 6.3.2 ghi kiểu giao tiếp và interface giữa từng cặp component. Hệ thống có ba luồng với đặc tính khác nhau:
-
-Luồng quét (đồng bộ, $\le$ 2 giây, chỉ trong Q1): máy quét $\rightarrow$ G1 $\rightarrow$ G3 $\rightarrow$ G2 $\rightarrow$ cổng xoay.
-
-Luồng đồng bộ (bất đồng bộ, gần thời gian thực): G3 $\rightarrow$ G4 $\rightarrow$ C1 khi đi lên, và C1 $\rightarrow$ G4 $\rightarrow$ G3 khi đi xuống.
-
-Luồng chốt kỳ (theo lô): C4 $\rightarrow$ C5 $\rightarrow$ HR/Payroll.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{figures/06_architecture_structure/component_diagram.png}
-\caption{Sơ đồ component của hệ thống TMC.}
-\label{fig:component_diagram}
-\end{figure}
-
-Mũi tên liền là lời gọi đồng bộ; mũi tên đứt là truyền bất đồng bộ.
-
-G5 gọi G2 khi bảo vệ mở cổng thủ công.
-
-Mọi module trung tâm đều ghi vào Audit Log (C8).
-
-C1 lấy danh sách QR hợp lệ từ C2 và lấy cấu hình từ C3, C9 để cấp cho Gate Agent.
+\subsubsection{Bước 1: Xác định component ứng viên từ subdomain}\label{sec:logical-step1}
+Vì hệ thống được phân rã theo domain (Mục~\ref{sec:partitioning}), điểm xuất phát tự nhiên là lấy mỗi subdomain ở Bảng~\ref{tab:subdomains} làm một component ứng viên. Để kiểm tra các ứng viên không bỏ sót trách nhiệm, nhóm đối chiếu từng ứng viên với các tác nhân và hành động chính của họ (Bảng~\ref{tab:candidate-components}).
 
 \begin{table}[H]
 \centering
+\caption{Component ứng viên xác định từ subdomain}\label{tab:candidate-components}
 \small
 \renewcommand{\arraystretch}{1.3}
-\caption{Cách giao tiếp giữa các component}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}X|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Từ $\rightarrow$ Đến} & \textbf{Kiểu giao tiếp} & \textbf{Interface / nội dung} \\
+\textbf{Subdomain} & \textbf{Component ứng viên} & \textbf{Tác nhân và hành động chính} \\
 \hline
-Máy quét $\rightarrow$ G1 & Đồng bộ, cục bộ & Sự kiện quét (nội dung QR, mã trạm) \\
+Kiểm soát ra vào và ghi nhận chấm công & Kiểm soát ra vào & Nhân viên quét mã QR; trạm cổng xác thực, mở cổng và ghi nhận lượt quét, giao dịch \\
 \hline
-G1 $\rightarrow$ G3 & Đồng bộ, cục bộ & AllowlistReader.find(), TransactionStore.append() \\
+Quản lý nhân viên và mã QR & Quản lý nhân viên và mã QR & HR/Payroll cung cấp dữ liệu nhân viên; nhân viên HR cấp, thu hồi QR credential; TMC Employee Portal lấy mã QR cho nhân viên \\
 \hline
-G1, G5 $\rightarrow$ G2 & Đồng bộ, có timeout & TurnstileGateway.open() \\
+Điều chỉnh chấm công và chốt kỳ & Điều chỉnh và chốt kỳ & Nhân viên HR điều chỉnh, bổ sung giao dịch; bộ lập lịch chốt kỳ và tạo đợt truyền \\
 \hline
-G2 $\rightarrow$ Hệ thống cổng xoay & Đồng bộ, mạng nội bộ nhà máy & API cổng xoay (C-01) \\
+Quản lý trạm cổng & Quản lý trạm cổng & Quản trị viên hệ thống cấu hình, bật/tắt trạm; bảo vệ theo dõi trạng thái trạm và mở cổng thủ công \\
 \hline
-G5 $\rightarrow$ G3 & Đồng bộ, cục bộ & Ghi ManualGateOpening \\
+Báo cáo và giám sát & Báo cáo & Nhân viên HR, giám sát sản xuất và ban lãnh đạo tra cứu, xuất báo cáo \\
 \hline
-G3 $\rightarrow$ G4 $\rightarrow$ C1 & Bất đồng bộ, giao ít nhất một lần, idempotent theo eventId & Giao dịch, lần quét bị từ chối, mở cổng thủ công, heartbeat \\
+Tích hợp HR/Payroll và cổng xoay & Tích hợp & Hệ thống gọi API cổng xoay; trao đổi dữ liệu với HR/Payroll \\
 \hline
-C1 $\rightarrow$ G4 $\rightarrow$ G3 & Bất đồng bộ, kéo định kỳ, trễ $\le$ 60 giây & Danh sách QR hợp lệ, cấu hình trạm \\
-\hline
-C2, C3, C9 $\rightarrow$ C1 & Domain event trong tiến trình & QrCredentialChanged, StationConfigChanged, SettingChanged \\
-\hline
-C1 $\rightarrow$ C4, C6 & Domain event trong tiến trình & TransactionRecorded \\
-\hline
-C4 $\rightarrow$ C6 & Domain event trong tiến trình & AdjustmentRecorded, PeriodStatusChanged \\
-\hline
-C4 $\rightarrow$ C5 & Bất đồng bộ qua outbox trung tâm & ExportBatchReady \\
-\hline
-C5 $\rightarrow$ HR/Payroll & Bất đồng bộ theo lô, gửi lại khi lỗi & HrPayrollGateway.submit() (C-01) \\
-\hline
-Client $\rightarrow$ C7 $\rightarrow$ các module & Đồng bộ, HTTPS & API của từng module; kiểm tra quyền trước khi xử lý \\
-\hline
-Mọi module $\rightarrow$ C8 & Trong tiến trình, ghi bền vững & AuditLog.record() \\
+Xác thực, phân quyền và audit & Xác thực, phân quyền và audit & Người dùng đăng nhập; quản trị viên hệ thống phân quyền, cấu hình, tra cứu nhật ký kiểm toán \\
 \hline
 \end{tabularx}
 \end{table}
 
-F1 – Quét QR qua cổng.
-
-G1 nhận nội dung QR từ máy quét và tra trong danh sách QR hợp lệ ở G3. G1 kiểm tra:
-
-QR ở trạng thái ACTIVE và nhân viên đang hoạt động;
-
-trạm đang bật (INV-03);
-
-lần quét không vi phạm anti-passback (INV-04).
-
-Nếu hợp lệ: G1 ghi AttendanceTransaction kèm eventId vào G3 trước. Chỉ sau đó G1 mới gửi lệnh mở cổng qua G2 và báo thành công trên kiosk (INV-05). Nếu không hợp lệ: G1 ghi ScanAttempt kèm lý do (INV-07) và hiển thị kết quả trên cả kiosk lẫn G5.
-
-Nếu gọi cổng xoay lỗi hoặc quá thời gian: giao dịch đã ghi vẫn giữ nguyên, và bảo vệ xử lý tại G5 bằng cách mở cổng thủ công (FR-09). Nếu nhân viên cuối cùng không qua cổng, HR hủy giao dịch bằng điều chỉnh (FR-15).
-
-Toàn bộ luồng chỉ dùng dữ liệu cục bộ. Phần lớn ngân sách 2 giây dành cho cổng xoay, vốn mất tối đa 500 ms (A-03).
-
-F2 – Đồng bộ giữa hai quantum.
-
-Chiều lên: G4 đọc outbox trong G3 và gửi lên C1. C1 bỏ qua bản trùng theo eventId rồi gửi xác nhận. G4 chỉ đánh dấu một bản ghi là đã gửi khi nhận được xác nhận.
-
-Chiều xuống: G4 kéo danh sách QR hợp lệ và cấu hình trạm về. Khi có mạng, độ trễ không quá 60 giây (INV-02).
-
-Heartbeat: G4 gửi heartbeat định kỳ để C3 phát hiện trạm offline.
-
-F3 – Điều chỉnh và chốt kỳ.
-
-Điều chỉnh: HR điều chỉnh giao dịch qua C4, bắt buộc có lý do. Giao dịch gốc được giữ nguyên (INV-08) và mọi thao tác được ghi vào C8.
-
-Chốt kỳ: đến lịch đặt trong C9, C4 chuyển kỳ sang CLOSED, tạo đợt MAIN và đưa vào outbox trung tâm. C5 gửi đợt này sang HR/Payroll; nếu lỗi thì gửi lại chính đợt đó. Lịch chốt được đặt đủ sớm để còn thời gian dự phòng trước 12:00 ngày 1 (NFR-03). C4 phát cảnh báo nếu đến sát hạn mà đợt MAIN vẫn chưa được HR/Payroll xác nhận.
-
-Sau khi khóa kỳ: khi kỳ đã ở trạng thái LOCKED, mọi điều chỉnh mới đi vào đợt SUPPLEMENTAL (INV-09).
-
-F4 – Gate Agent mất kết nối. Gate Agent vận hành theo Bảng 6.3.3.
+\subsubsection{Bước 2: Gán yêu cầu chức năng và phát hiện vấn đề}\label{sec:logical-step2}
+Toàn bộ FR-01 đến FR-28 được gán cho bảy component ứng viên như ở Bảng~\ref{tab:candidate-fr}.
 
 \begin{table}[H]
 \centering
+\caption{Gán yêu cầu chức năng cho component ứng viên}\label{tab:candidate-fr}
 \small
 \renewcommand{\arraystretch}{1.3}
-\caption{Hành vi của Gate Agent theo trạng thái kết nối}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{5cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Component ứng viên} & \textbf{Yêu cầu chức năng được gán} \\
+\hline
+Kiểm soát ra vào & FR-11, FR-12, FR-13, FR-14, FR-15, FR-17 \\
+\hline
+Quản lý nhân viên và mã QR & FR-01, FR-02, FR-03, FR-04, FR-05, FR-06 \\
+\hline
+Điều chỉnh và chốt kỳ & FR-16, FR-21, FR-22 \\
+\hline
+Quản lý trạm cổng & FR-07, FR-08, FR-09, FR-10 \\
+\hline
+Báo cáo & FR-18, FR-19, FR-20 \\
+\hline
+Tích hợp & FR-01 (nhận dữ liệu nhân viên), FR-12 (gọi API cổng xoay), FR-21 (truyền dữ liệu chấm công) \\
+\hline
+Xác thực, phân quyền và audit & FR-23, FR-24, FR-25, FR-26, FR-27, FR-28 \\
+\hline
+\end{tabularx}
+\end{table}
+
+Khi đối chiếu cách gán trên với phân tích quantum (Bảng~\ref{tab:subdomain-quantum}) và các bất biến (Bảng~\ref{tab:invariants}), nhóm phát hiện năm vấn đề (Bảng~\ref{tab:logical-issues}).
+
+\begin{table}[H]
+\centering
+\caption{Các vấn đề phát hiện khi gán yêu cầu chức năng}\label{tab:logical-issues}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{0.8cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{4.6cm}|}
+\hline
+\textbf{Mã} & \textbf{Vấn đề} & \textbf{Căn cứ} \\
+\hline
+V1 & Component \textit{Kiểm soát ra vào} trải trên hai quantum: phần quyết định cho qua (FR-11, FR-12, FR-14, FR-17) phải chạy tại cổng, còn phần lưu trữ tập trung phục vụ báo cáo và chốt kỳ (FR-13, FR-15) thuộc trung tâm. & Bảng~\ref{tab:subdomain-quantum}; K2, K4 tại cổng; K1, K3 tại trung tâm \\
+\hline
+V2 & Component \textit{Tích hợp} gộp hai hệ thống ngoài có cách gọi trái ngược: cổng xoay được gọi đồng bộ ở mỗi lượt quét trong ngân sách 2 giây tại nhà máy; HR/Payroll được gọi theo lô, hai chiều, tại trung tâm. & A-04; C-02; NFR-MOD-01 \\
+\hline
+V3 & Component \textit{Quản lý trạm cổng} đặt ở trung tâm, nhưng mở cổng thủ công (FR-10) và theo dõi trạng thái trạm tại chỗ (một phần FR-09) phải hoạt động được khi mất kết nối. & FR-17; NFR-AVL-04 \\
+\hline
+V4 & Component \textit{Xác thực, phân quyền và audit} gộp ba nhu cầu khác nhau: kiểm tra quyền ở mọi yêu cầu; nhật ký chỉ ghi thêm với thời hạn lưu riêng; và tham số cấu hình được nhiều component dùng chung (FR-28). & INV-10; NFR-AUD-03, NFR-AUD-05 \\
+\hline
+V5 & Không component nào chịu trách nhiệm lưu bền vững tại cổng và đồng bộ dữ liệu hai chiều giữa hai quantum. Đây là yêu cầu ngầm, không ứng với một FR riêng. & INV-05, INV-06; FR-17; NFR-REL-03 \\
+\hline
+\end{tabularx}
+\end{table}
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Ba trong năm vấn đề (V1, V3, V5) là hệ quả trực tiếp của yêu cầu \textit{hoạt động khi mất kết nối}: nếu giữ nguyên các component ứng viên, việc ra vào hoặc mở cổng thủ công sẽ phụ thuộc vào trung tâm. V1 còn liên quan đến vấn đề \textit{mã QR tĩnh}: việc xác thực mã QR thuộc phần chạy tại cổng, nên phải được thực hiện mà không tra cứu trực tuyến lên trung tâm.
+
+\subsubsection{Bước 3: Tinh chỉnh theo đặc tính kiến trúc và quantum}\label{sec:logical-step3}
+Mỗi vấn đề ở Bước 2 được giải quyết bằng một quyết định tách hoặc gộp component (Bảng~\ref{tab:logical-refinement}). Mỗi quyết định đều dựa trên đặc tính kiến trúc (K1--K8), quantum hoặc bất biến nghiệp vụ.
+
+\begin{table}[H]
+\centering
+\caption{Các quyết định tinh chỉnh component}\label{tab:logical-refinement}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{0.8cm}|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}p{1.4cm}|>{\raggedright\arraybackslash}p{4.4cm}|}
+\hline
+\textbf{Mã} & \textbf{Quyết định} & \textbf{Vấn đề} & \textbf{Lý do} \\
+\hline
+T1 & Tách \textit{Kiểm soát ra vào} thành \textbf{G1 Access Control} (Q1) và \textbf{C1 Gate Sync \& Ingestion} (Q2) & V1 & G1 phục vụ K2, K4; C1 phục vụ K1, K3 \\
+\hline
+T2 & Tách \textit{Tích hợp} thành \textbf{G2 Turnstile Adapter} (Q1) và \textbf{C5 HR/Payroll Adapter} (Q2, hai chiều) & V2 & Khác đặc tính và quantum; mỗi adapter cách ly một hệ thống ngoài (NFR-MOD-01) \\
+\hline
+T3 & Thêm \textbf{G5 Guard Console} tại cổng cho FR-10 và phần FR-09 tại chỗ; \textbf{C3 Gate Station Management} ở trung tâm giữ phần cấu hình và giám sát tập trung & V3 & K4; thao tác mở cổng thủ công được ghi cục bộ rồi đồng bộ để không mất audit \\
+\hline
+T4 & Tách thành \textbf{C7 IAM/RBAC}, \textbf{C8 Audit Log} và \textbf{C9 Configuration} & V4 & C8 có quy tắc truy cập và thời hạn lưu riêng (INV-10); C9 được nhiều component dùng chung \\
+\hline
+T5 & Thêm hai component kỹ thuật \textbf{G3 Local Store \& Outbox} và \textbf{G4 Gate Sync Agent} & V5 & Bảo đảm INV-05 (lưu trước khi báo thành công) và INV-06 (đồng bộ không trùng) \\
+\hline
+T6 & Giữ \textit{Điều chỉnh và chốt kỳ} thành một component \textbf{C4 Adjustment \& Period Closing} & -- & Điều chỉnh và chốt kỳ cùng chịu INV-09; tách đôi sẽ phải đồng bộ trạng thái kỳ giữa hai nơi \\
+\hline
+T7 & Giữ \textbf{C6 Reporting \& Monitoring} trong Central Quantum, chỉ đọc qua read model & -- & Tải thấp, dùng chung kho dữ liệu trung tâm (Mục~\ref{sec:quantum}) \\
+\hline
+\end{tabularx}
+\end{table}
+
+Kết quả là 14 component: 5 component thuộc Gate Agent (mỗi nhà máy một thể hiện) và 9 component là các module của Central Quantum (Bảng~\ref{tab:components}). Cột \textit{Dữ liệu sở hữu} xác định component nào là nơi duy nhất được ghi dữ liệu tương ứng; các component khác chỉ đọc qua interface hoặc nhận bản sao.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\centering\arraybackslash}p{0.7cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{1.9cm}|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{2.2cm}|}
+\caption{Danh mục component của hệ thống}\label{tab:components}\\
+\hline
+\textbf{Mã} & \textbf{Component} & \textbf{Trách nhiệm} & \textbf{FR} & \textbf{Dữ liệu sở hữu} & \textbf{Đặc tính chính} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Component} & \textbf{Trách nhiệm} & \textbf{FR} & \textbf{Dữ liệu sở hữu} & \textbf{Đặc tính chính} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\multicolumn{6}{|l|}{\textbf{Q1 Gate Quantum -- Gate Agent (mỗi nhà máy một thể hiện)}} \\
+\hline
+G1 & Access Control & Xác thực mã QR (chữ ký, thời hạn, mã dùng một lần); kiểm tra credential và nhân viên đang hoạt động, trạm đang bật (INV-03), chống quẹt lặp chiều (INV-04); điều phối luồng quét: ghi lượt quét, yêu cầu mở cổng, ghi giao dịch khi cổng xác nhận (INV-05); hiển thị kết quả trên kiosk & FR-08, FR-11, FR-13, FR-14, FR-15, FR-17 & Trạng thái chống quẹt lặp chiều; danh sách mã đã dùng & Performance, Reliability, Data Integrity, Security \\
+\hline
+G2 & Turnstile Adapter & Gọi API cổng xoay với giới hạn thời gian chờ; kiểm tra trạng thái cổng trước khi gửi lại lệnh (NFR-REL-02); mỗi nhà cung cấp cổng xoay là một plugin & FR-12 & -- & Performance, Availability, Modifiability \\
+\hline
+G3 & Local Store \& Outbox & Kho cục bộ bền vững, được mã hóa; lưu bản sao dữ liệu tham chiếu, các bản ghi phát sinh tại cổng và hàng đợi outbox & FR-13, FR-15, FR-17 & Lượt quét, giao dịch, lần mở cổng thủ công tại cổng; outbox; bản sao credential, khóa công khai, cấu hình trạm & Reliability, Data Integrity, Privacy \\
+\hline
+G4 & Gate Sync Agent & Đẩy outbox lên C1 (ít nhất một lần); kéo bản sao dữ liệu tham chiếu về ($\le$ 60 giây); gửi heartbeat & FR-05, FR-09, FR-17 & Mốc đồng bộ & Reliability, Availability \\
+\hline
+G5 & Guard Console & Hiển thị lượt quét bị từ chối, mở cổng thất bại và trạng thái trạm tại chỗ; mở cổng thủ công bắt buộc nhập lý do, ghi vào G3 & FR-09, FR-10, FR-15 & -- & Availability, Security, Auditability \\
+\hline
+\multicolumn{6}{|l|}{\textbf{Q2 Central Quantum -- modular monolith}} \\
+\hline
+C1 & Gate Sync \& Ingestion & Tiếp nhận dữ liệu từ các Gate Agent, idempotent theo mã sự kiện (INV-06); lưu lượt quét và giao dịch bất biến; cung cấp bản sao dữ liệu tham chiếu cho Gate Agent & FR-05, FR-13, FR-15, FR-17 & Lượt quét và giao dịch chấm công tập trung & Reliability, Data Integrity, Security \\
+\hline
+C2 & Employee \& QR Management & Cập nhật hồ sơ nhân viên từ dữ liệu đồng bộ; cấp, thu hồi, cấp lại QR credential (INV-01); ký và cấp mã QR động cho TMC Employee Portal & FR-01, FR-02, FR-03, FR-04 & Nhân viên, bộ phận, QR credential, khóa ký & Security, Privacy, Data Integrity \\
+\hline
+C3 & Gate Station Management & Đăng ký, cập nhật, bật/tắt trạm; theo dõi heartbeat và cảnh báo trạm mất kết nối; lưu nhật ký mở cổng thủ công & FR-07, FR-08, FR-09 & Trạm cổng, lần mở cổng thủ công & Availability, Auditability \\
+\hline
+C4 & Adjustment \& Period Closing & Điều chỉnh, bổ sung giao dịch, giữ bản gốc (INV-08); quản lý kỳ OPEN $\rightarrow$ CLOSED $\rightarrow$ LOCKED; tạo đợt truyền chính và bổ sung (INV-09) & FR-16, FR-21 & Điều chỉnh, kỳ chấm công, đợt truyền & Reliability, Data Integrity, Auditability \\
+\hline
+C5 & HR/Payroll Adapter & Nhận dữ liệu nhân viên từ HR/Payroll; gửi đợt dữ liệu chấm công, gửi lại khi lỗi, idempotent theo mã đợt; theo dõi trạng thái truyền & FR-01, FR-21, FR-22 & Lịch sử các lần gửi & Reliability, Interoperability, Modifiability \\
+\hline
+C6 & Reporting \& Monitoring & Read model chỉ đọc cho báo cáo và màn hình theo dõi; tính chỉ tiêu dẫn xuất theo lịch làm việc; lọc dữ liệu theo phạm vi người xem (INV-11); xuất Excel & FR-18, FR-19, FR-20 & Read model (dẫn xuất, dựng lại được) & Security, Privacy \\
+\hline
+C7 & IAM / RBAC & Đăng nhập; quản lý tài khoản, vai trò, quyền; kiểm tra quyền cho mọi API & FR-25, FR-26, FR-27 & Tài khoản, vai trò, quyền & Security \\
+\hline
+C8 & Audit Log & Ghi nhật ký chỉ thêm cho các thao tác quan trọng, kể cả thao tác phát sinh tại cổng; tra cứu, lọc; lưu tối thiểu 12 tháng (INV-10) & FR-06, FR-23, FR-24 & Nhật ký kiểm toán & Auditability, Security, Privacy \\
+\hline
+C9 & Configuration & Quản lý tham số vận hành: lịch truyền HR/Payroll, lịch làm việc cố định, ngưỡng mất kết nối, thời gian lưu dữ liệu & FR-28 & Tham số hệ thống, lịch làm việc & Modifiability, Availability \\
+\hline
+\end{longtable}
+\endgroup
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Sau tinh chỉnh, mọi component cần cho việc ra vào (G1, G2, G3, G5) đều nằm tại cổng; G3 và G4 là hai component được thêm vào chỉ để giải quyết vấn đề \textit{mất kết nối} -- G3 giữ dữ liệu an toàn khi trung tâm không liên lạc được, G4 đồng bộ bù khi kết nối trở lại. Đối với vấn đề \textit{mã QR tĩnh}, trách nhiệm được chia giữa hai component ở hai quantum: C2 là nơi duy nhất giữ khóa bí mật và ký mã QR động; G1 kiểm tra chữ ký, thời hạn và tính dùng một lần của mã bằng khóa công khai do G4 đồng bộ xuống.
+
+\subsubsection{Bước 4: Xác định interface và connector}\label{sec:logical-step4}
+Kiểu connector giữa các component được chọn theo bốn nguyên tắc rút ra từ Mục~\ref{sec:style-selection}:
+\begin{itemize}
+    \item Giữa hai quantum chỉ dùng connector bất đồng bộ dựa trên một hợp đồng dữ liệu có quản lý phiên bản (\textit{sync-contract}); không có lời gọi đồng bộ từ Q1 lên Q2 trên đường xử lý lượt quét.
+    \item Bên trong Gate Agent dùng lời gọi đồng bộ cục bộ; riêng lời gọi tới cổng xoay có giới hạn thời gian chờ.
+    \item Bên trong Central Quantum, truy vấn dùng interface công khai của module; thông báo thay đổi trạng thái dùng sự kiện trong tiến trình để module phát không phụ thuộc vào module nhận.
+    \item Mọi giao tiếp với hệ thống bên ngoài đi qua adapter.
+\end{itemize}
+Bảng~\ref{tab:connectors} liệt kê các connector, kèm lý do chọn kiểu. Các connector này được thể hiện trên sơ đồ component trong góc nhìn component-and-connector (Mục~\ref{sec:views}).
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.9cm}|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{4.9cm}|>{\raggedright\arraybackslash}p{4.4cm}|}
+\caption{Danh mục connector giữa các component}\label{tab:connectors}\\
+\hline
+\textbf{Từ $\rightarrow$ Đến} & \textbf{Kiểu} & \textbf{Interface / nội dung} & \textbf{Lý do chọn kiểu} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Từ $\rightarrow$ Đến} & \textbf{Kiểu} & \textbf{Interface / nội dung} & \textbf{Lý do chọn kiểu} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Máy quét, kiosk $\rightarrow$ G1 & Đồng bộ, cục bộ & Yêu cầu quét (chuỗi mã QR, mã trạm) & Nhân viên đang chờ kết quả \\
+\hline
+G1 $\rightarrow$ G3 & Đồng bộ, cục bộ, ghi bền vững & \texttt{CredentialReader}, \texttt{ScanAttemptStore}, \texttt{TransactionStore} & Phải ghi xong trước khi báo thành công (INV-05) \\
+\hline
+G1, G5 $\rightarrow$ G2 & Đồng bộ, có giới hạn thời gian chờ & \texttt{TurnstileGateway.open()}, \texttt{status()} & Cần xác nhận mở cổng; giới hạn chờ để giữ ngân sách 2 giây \\
+\hline
+G2 $\rightarrow$ hệ thống cổng xoay & Đồng bộ, mạng LAN nhà máy & API của nhà cung cấp (C-01, NFR-INT-01) & Hợp đồng do hệ thống bên ngoài quy định \\
+\hline
+G5 $\rightarrow$ G3 & Đồng bộ, cục bộ & Ghi lần mở cổng thủ công & Không mất audit khi mất kết nối \\
+\hline
+G3 $\rightarrow$ G4 $\rightarrow$ C1 (chiều lên) & Bất đồng bộ qua outbox, ít nhất một lần, idempotent & \textit{sync-contract}: lô sự kiện gồm giao dịch, lượt quét, mở cổng thủ công, heartbeat & Không chặn luồng quét; chịu được mất kết nối (FR-17) \\
+\hline
+C1 $\rightarrow$ G4 $\rightarrow$ G3 (chiều xuống) & Bất đồng bộ, Gate Agent kéo định kỳ theo phần thay đổi & \textit{sync-contract}: credential, khóa công khai, cấu hình trạm & Gate Agent chủ động cập nhật khi có kết nối; $\le$ 60 giây (NFR-SEC-06) \\
+\hline
+TMC Employee Portal $\rightarrow$ C2 & Đồng bộ, HTTPS & API cấp mã QR động & Nhân viên cần mã QR ngay khi mở Portal \\
+\hline
+C2, C3, C9 $\rightarrow$ C1 & Sự kiện trong tiến trình & \texttt{QrCredentialChanged}, \texttt{StationConfigChanged}, \texttt{SettingChanged} & C1 cập nhật dữ liệu phát xuống cổng mà không phụ thuộc trực tiếp vào module nguồn \\
+\hline
+C1 $\rightarrow$ C3 & Lời gọi trong tiến trình & Interface của C3 ghi heartbeat và lần mở cổng thủ công nhận từ Gate Agent & Gọi trực tiếp thay vì phát sự kiện để không tạo vòng phụ thuộc giữa C1 và C3 \\
+\hline
+C1 $\rightarrow$ C4, C6 & Sự kiện trong tiến trình & \texttt{TransactionRecorded} & C1 không cần biết module nào sử dụng giao dịch \\
+\hline
+C4 $\rightarrow$ C6 & Sự kiện trong tiến trình & \texttt{AdjustmentRecorded}, \texttt{PeriodStatusChanged} & Read model được cập nhật sau mỗi thay đổi \\
+\hline
+C4 $\rightarrow$ C5 & Bất đồng bộ qua outbox trung tâm & \texttt{ExportBatchReady} & Việc gửi lại không ảnh hưởng nghiệp vụ chốt kỳ \\
+\hline
+C5 $\rightarrow$ HR/Payroll & Bất đồng bộ theo lô, gửi lại khi lỗi & \texttt{HrPayrollGateway.submit()} (C-01) & Hạn 12:00 ngày 1 có thời gian dự phòng; HR/Payroll có thể tạm thời không khả dụng (R-03) \\
+\hline
+HR/Payroll $\rightarrow$ C5 $\rightarrow$ C2 & Bất đồng bộ, kéo định kỳ & \texttt{EmployeeSourceGateway}\allowbreak\texttt{.fetchChanges()}; C5 gọi interface của C2 để cập nhật dữ liệu nhân viên & HR/Payroll là nguồn dữ liệu nhân sự chính thức (FR-01); gọi trực tiếp để không tạo vòng phụ thuộc \\
+\hline
+Giao diện web $\rightarrow$ C7 $\rightarrow$ các module & Đồng bộ, HTTPS & API của từng module; kiểm tra quyền trước khi xử lý & Người dùng chờ kết quả; NFR-SEC-01 \\
+\hline
+Mọi module $\rightarrow$ C8 & Trong tiến trình, ghi bền vững & \texttt{AuditLog.record()} & Thao tác quan trọng không được thiếu nhật ký (NFR-AUD-01) \\
+\hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Bước 5: Kiểm chứng kiến trúc logic}\label{sec:logical-step5}
+Kiến trúc logic được kiểm chứng theo hai cách: truy vết yêu cầu chức năng và chạy thử các kịch bản chất lượng trên các component.
+
+\paragraph{Truy vết yêu cầu chức năng.} Theo Bảng~\ref{tab:components}, mỗi yêu cầu từ FR-01 đến FR-28 đều có ít nhất một component đảm nhận. Năm yêu cầu được chia cho nhiều component vì trải trên hai quantum hoặc liên quan đến hệ thống bên ngoài: FR-01 (C5 nhận dữ liệu, C2 cập nhật hồ sơ), FR-13 và FR-15 (G1, G3 ghi tại cổng; C1 lưu tập trung), FR-17 (G1, G3, G4 tại cổng; C1 tiếp nhận) và FR-21 (C4 tổng hợp, chốt kỳ; C5 truyền dữ liệu).
+
+\paragraph{Kịch bản chất lượng.} Bảng~\ref{tab:quality-scenarios} đi qua các kịch bản gắn với NFR quan trọng để kiểm tra kiến trúc logic có cơ chế đáp ứng và có component chịu trách nhiệm cho từng kịch bản.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{4.3cm}|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{6.0cm}|>{\raggedright\arraybackslash}p{2.3cm}|}
+\caption{Kiểm chứng kiến trúc logic bằng kịch bản chất lượng}\label{tab:quality-scenarios}\\
+\hline
+\textbf{Kịch bản} & \textbf{NFR} & \textbf{Cơ chế đáp ứng} & \textbf{Component} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Kịch bản} & \textbf{NFR} & \textbf{Cơ chế đáp ứng} & \textbf{Component} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Giờ giao ca, 800 lượt quét trong 30 phút tại một nhà máy & NFR-PER-01, NFR-PER-02 & Đường xử lý chỉ dùng dữ liệu cục bộ và một lời gọi tới cổng xoay; không gọi trung tâm & G1, G2, G3 \\
+\hline
+Gate Agent mất nguồn ngay sau khi cổng mở & NFR-REL-03 & Lượt quét được ghi bền vững trước khi gọi cổng; lượt còn ở trạng thái chờ xác nhận được đưa vào danh sách đối soát khi khởi động lại & G1, G3, G5 \\
+\hline
+Mất kết nối với trung tâm trong 2 giờ & FR-17, NFR-AVL-04 & Gate Agent tiếp tục xử lý bằng dữ liệu cục bộ; dữ liệu tích lũy trong outbox và được gửi bù khi có kết nối & G1, G3, G4, C1 \\
+\hline
+Một lô dữ liệu được gửi lên hai lần & NFR-DIN-02 & C1 bỏ qua bản ghi trùng theo mã sự kiện & G4, C1 \\
+\hline
+Ảnh chụp mã QR được dùng lại sau 2 phút hoặc được quét lần thứ hai & NFR-SEC-05 & Mã QR hết hạn hoặc đã sử dụng bị từ chối & G1, C2 \\
+\hline
+Nhân viên HR thu hồi QR credential & NFR-SEC-06 & Portal ngừng cấp mã cho credential đã thu hồi; bản sao tại cổng được cập nhật $\le$ 60 giây & C2, C1, G4, G1 \\
+\hline
+HR/Payroll không phản hồi khi gửi đợt truyền chính & NFR-REL-04, NFR-INT-02 & Gửi lại theo exponential backoff; cảnh báo khi gần hạn 12:00 & C4, C5 \\
+\hline
+Giám sát sản xuất truy vấn dữ liệu ngoài bộ phận phụ trách & NFR-PRI-01 & Kiểm tra quyền và lọc dữ liệu theo phạm vi người xem & C7, C6 \\
+\hline
+\end{longtable}
+\endgroup
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Kịch bản thứ hai và thứ ba trong Bảng~\ref{tab:quality-scenarios} kiểm chứng giải pháp cho vấn đề \textit{mất kết nối} ở cả hai mức: mất kết nối giữa cổng và trung tâm (G3, G4, C1) và gián đoạn ngay trong lúc xử lý một lượt quét (G1, G3). Kịch bản thứ năm và thứ sáu kiểm chứng giải pháp cho vấn đề \textit{mã QR tĩnh}: mã bị lộ chỉ dùng được trong thời hạn ngắn và chỉ một lần, còn việc thu hồi có hiệu lực ngay cả khi trạm cổng tạm thời chưa nhận được bản cập nhật.
+
+\subsection{Xây dựng kiến trúc vật lý}\label{sec:physical-architecture}
+Kiến trúc vật lý xác định các component ở Bảng~\ref{tab:components} được triển khai trên những node nào, trong môi trường thực thi nào, và các node kết nối với nhau qua vùng mạng, giao thức nào. Kiến trúc vật lý được xây dựng qua năm bước: chọn topology triển khai; xác định node; ánh xạ component vào node; thiết kế phân vùng mạng và bảo mật kênh truyền; kiểm chứng kết quả.
+
+\subsubsection{Bước 1: Chọn topology triển khai}\label{sec:physical-step1}
+Phân tích quantum (Mục~\ref{sec:quantum}) cho thấy hệ thống có một phần phải chạy tại nhà máy và một phần chạy tập trung. Bảng~\ref{tab:topology-options} so sánh ba topology triển khai dựa trên kết luận này.
+
+\begin{table}[H]
+\centering
+\caption{So sánh các topology triển khai}\label{tab:topology-options}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}p{1.4cm}|}
+\hline
+\textbf{Topology} & \textbf{Mô tả} & \textbf{Đánh giá} & \textbf{Kết luận} \\
+\hline
+Tập trung hoàn toàn & Mọi xử lý đặt tại trung tâm; thiết bị tại cổng chỉ gửi yêu cầu qua WAN & Mỗi lượt quét phụ thuộc đường truyền WAN: khi mất kết nối thì cổng ngừng hoạt động (vi phạm FR-17, R-02); thời gian phản hồi biến động theo chất lượng đường truyền (NFR-PER-01) & Loại \\
+\hline
+Phân tán hoàn toàn & Mỗi nhà máy có một hệ thống đầy đủ, chạy độc lập & Dữ liệu chấm công, tài khoản, phân quyền và audit bị phân mảnh; khó tổng hợp dữ liệu để truyền sang HR/Payroll đúng hạn (C-02); chi phí vận hành tăng theo số nhà máy & Loại \\
+\hline
+Kết hợp biên -- trung tâm (hybrid edge-central) & Gate Agent đặt tại nhà máy; Central đặt tại trung tâm dữ liệu & Đúng với hai quantum: việc ra vào không phụ thuộc WAN, dữ liệu vẫn được quản lý tập trung & Chọn \\
+\hline
+\end{tabularx}
+\end{table}
+
+Trong topology được chọn, cần quyết định thêm Gate Agent được triển khai \textbf{trên từng kiosk tại mỗi trạm cổng} hay \textbf{trên một máy chủ biên dùng chung cho cả nhà máy}. Nếu triển khai trên từng kiosk, mỗi trạm có kho dữ liệu riêng nên quy tắc chống quẹt lặp chiều trong phạm vi nhà máy (INV-04) phải đồng bộ ngang giữa các kiosk; số node cần cập nhật và bảo vệ tăng theo số trạm; dữ liệu nhân bản nằm rải rác tại hiện trường. Nếu triển khai trên máy chủ biên của nhà máy, mọi trạm dùng chung một kho cục bộ nên quy tắc chống quẹt lặp chiều nhất quán, bảng điều khiển của bảo vệ (G5) dùng chung dữ liệu, số node ít và đặt được trong phòng kỹ thuật. Nhược điểm của cách này là máy chủ biên trở thành điểm lỗi chung của nhà máy; nhược điểm này được khắc phục bằng một node dự phòng nóng. Nhóm chọn \textbf{Gate Agent chạy trên máy chủ biên của từng nhà máy}; kiosk tại trạm cổng chỉ là thiết bị đầu cuối. Quyết định này được ghi nhận trong ADR-01 (Mục~\ref{sec:architecture-decisions}).
+
+\subsubsection{Bước 2: Xác định node và môi trường thực thi}\label{sec:physical-step2}
+Bảng~\ref{tab:nodes} liệt kê các node của hệ thống và các hệ thống bên ngoài mà hệ thống kết nối tới. Sơ đồ triển khai được trình bày trong góc nhìn allocation (Mục~\ref{sec:views}).
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{1.6cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{4.0cm}|}
+\caption{Các node và môi trường thực thi}\label{tab:nodes}\\
+\hline
+\textbf{Node} & \textbf{Vị trí} & \textbf{Số lượng} & \textbf{Phần cứng / môi trường thực thi} & \textbf{Vai trò} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Node} & \textbf{Vị trí} & \textbf{Số lượng} & \textbf{Phần cứng / môi trường thực thi} & \textbf{Vai trò} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Factory Edge Server & Phòng kỹ thuật tại mỗi nhà máy & 2 mỗi nhà máy (chính và dự phòng nóng) & Máy chủ công nghiệp nhỏ gọn, Linux, 4 vCPU, 8 GB RAM, SSD công nghiệp; môi trường chạy container; CSDL nhúng SQLite được mã hóa & Chạy Gate Agent; dữ liệu cục bộ được sao chép liên tục sang node dự phòng \\
+\hline
+Gate Kiosk Terminal & Tại mỗi trạm cổng & Theo số trạm & Máy tính nhúng có màn hình, máy quét mã QR kết nối USB; trình duyệt ở chế độ kiosk & Nhận chuỗi mã QR, hiển thị kết quả; không lưu dữ liệu nghiệp vụ \\
+\hline
+Guard Desk Terminal & Phòng bảo vệ tại mỗi nhà máy & Tối thiểu 1 & Máy tính hoặc máy tính bảng, trình duyệt & Giao diện bảng điều khiển của bảo vệ \\
+\hline
+Reverse Proxy & Vùng DMZ của trung tâm dữ liệu & 1 & Máy ảo Linux, 2 vCPU, 4 GB RAM; Nginx & Điểm vào duy nhất của trung tâm; kết thúc TLS; xác thực chứng chỉ của Gate Agent; định tuyến và giới hạn tần suất truy cập \\
+\hline
+Central Application Server & Vùng ứng dụng của trung tâm dữ liệu & 2 (chạy song song) & Máy ảo Linux, 4 vCPU, 8 GB RAM; môi trường chạy container & Chạy Central (C1--C9) \\
+\hline
+Central Database & Vùng dữ liệu của trung tâm dữ liệu & 2 (chính và dự phòng) & PostgreSQL với bản sao dự phòng; sao lưu hằng ngày (NFR-REC-01) & Lưu dữ liệu tập trung, audit log, read model \\
+\hline
+\multicolumn{5}{|l|}{\textit{Hệ thống bên ngoài}} \\
+\hline
+Turnstile Controller & Tại mỗi cổng xoay & Theo số cổng & Bộ điều khiển phần cứng của nhà cung cấp & Mở cổng theo lệnh qua API (A-01, A-04) \\
+\hline
+HR/Payroll & Trung tâm dữ liệu & 1 & Hệ thống hiện có & Cung cấp dữ liệu nhân viên; tiếp nhận dữ liệu chấm công \\
+\hline
+TMC Employee Portal & Hạ tầng hiện có của TMC & 1 & Hệ thống hiện có & Hiển thị mã QR động cho nhân viên (A-02) \\
+\hline
+\end{longtable}
+\endgroup
+
+Hai quyết định về số lượng node cần giải thích thêm. Thứ nhất, \textbf{Central Application Server có hai node chạy song song} dù tải thấp, vì việc cấp mã QR động nằm trên đường đi của nhân viên: nếu Central ngừng hoạt động, sau tối đa 60 giây sẽ không còn mã hợp lệ để qua cổng. Thứ hai, \textbf{không dùng bộ nhớ đệm (cache) tập trung} như phương án ban đầu, vì Central không nằm trên đường xử lý lượt quét; việc lưu đệm trạng thái credential ở trung tâm không cải thiện hiệu năng tại cổng mà còn thêm nguy cơ dùng trạng thái cũ (R-04).
+
+\subsubsection{Bước 3: Ánh xạ component vào node}\label{sec:physical-step3}
+Bảng~\ref{tab:component-node} ánh xạ từng component vào node và nêu lý do dựa trên đặc tính kiến trúc.
+
+\begin{table}[H]
+\centering
+\caption{Ánh xạ component vào node}\label{tab:component-node}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Component} & \textbf{Node} & \textbf{Lý do} \\
+\hline
+G1, G2, G3, G4 & Factory Edge Server & Phải hoạt động khi mất kết nối WAN (K4); gần cổng xoay để giữ ngân sách 2 giây (A-04); một kho cục bộ chung cho toàn nhà máy bảo đảm INV-04 \\
+\hline
+G5 (xử lý nghiệp vụ) & Factory Edge Server & Thao tác mở cổng thủ công được ghi vào G3 ngay tại máy chủ biên, không mất khi thiết bị của bảo vệ gặp sự cố \\
+\hline
+G5 (giao diện) & Guard Desk Terminal & Bảo vệ thao tác tại chỗ, kể cả khi mất kết nối với trung tâm \\
+\hline
+Giao diện kiosk của G1 & Gate Kiosk Terminal & Thiết bị đầu cuối không lưu dữ liệu, giảm rủi ro khi thiết bị đặt ở hiện trường bị can thiệp (Privacy) \\
+\hline
+C1 -- C9 & Central Application Server & Một đơn vị triển khai duy nhất (modular monolith); hai node chạy song song để bảo đảm việc cấp mã QR động \\
+\hline
+Dữ liệu của C1 -- C9 & Central Database & Giao dịch ACID cho INV-01, INV-08, INV-09; sao lưu và khôi phục tập trung (NFR-REC-01, NFR-REC-02) \\
+\hline
+-- & Reverse Proxy & Tách vùng mạng công khai với vùng ứng dụng; tập trung kiểm soát kết nối từ Gate Agent và Portal \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bước 4: Phân vùng mạng, giao thức và bảo mật kênh truyền}\label{sec:physical-step4}
+Hệ thống được đặt trong năm vùng mạng: mạng trạm cổng của nhà máy, mạng thiết bị điều khiển (OT) của nhà máy, đường truyền WAN giữa nhà máy và trung tâm, vùng DMZ của trung tâm và vùng ứng dụng, dữ liệu của trung tâm. Bảng~\ref{tab:network} mô tả từng kết nối.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{5.6cm}|}
+\caption{Kết nối mạng, giao thức và biện pháp bảo vệ}\label{tab:network}\\
+\hline
+\textbf{Kết nối} & \textbf{Vùng mạng / đường truyền} & \textbf{Giao thức} & \textbf{Biện pháp bảo vệ} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Kết nối} & \textbf{Vùng mạng / đường truyền} & \textbf{Giao thức} & \textbf{Biện pháp bảo vệ} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Gate Kiosk Terminal, Guard Desk Terminal $\leftrightarrow$ Factory Edge Server & Mạng trạm cổng của nhà máy (VLAN riêng) & HTTPS, WebSocket & TLS (NFR-SEC-03); thiết bị đầu cuối chỉ được truy cập máy chủ biên; bảo vệ phải đăng nhập để mở cổng thủ công \\
+\hline
+Factory Edge Server $\leftrightarrow$ Turnstile Controller & Mạng OT của nhà máy, VLAN cô lập & API của nhà cung cấp (HTTP hoặc TCP) & Tuân theo hợp đồng API của nhà cung cấp (NFR-INT-01); VLAN cô lập, không truy cập Internet \\
+\hline
+Factory Edge Server $\leftrightarrow$ Reverse Proxy & WAN qua VPN site-to-site (A-05) & HTTPS, REST/JSON theo \textit{sync-contract} & TLS $\ge$ 1.2; mỗi Gate Agent có chứng chỉ thiết bị riêng (mTLS), ngăn thiết bị giả mạo gửi dữ liệu chấm công \\
+\hline
+TMC Employee Portal $\leftrightarrow$ Reverse Proxy & Mạng doanh nghiệp & HTTPS & OAuth 2.0 (client credentials); mã QR chỉ được cấp cho nhân viên đã được Portal xác thực (FR-03) \\
+\hline
+Giao diện web người dùng $\leftrightarrow$ Reverse Proxy & Mạng doanh nghiệp & HTTPS & Đăng nhập, token có thời hạn, kiểm tra quyền ở mọi API (NFR-SEC-01) \\
+\hline
+Central Application Server $\leftrightarrow$ HR/Payroll & Mạng nội bộ của trung tâm & HTTPS, REST & Xác thực theo hợp đồng API; chỉ gửi các trường trong hợp đồng dữ liệu (NFR-PRI-02) \\
+\hline
+Central Application Server $\leftrightarrow$ Central Database & Vùng dữ liệu & Giao thức PostgreSQL qua TLS & Chỉ Central Application Server được truy cập; dữ liệu được mã hóa khi lưu \\
+\hline
+\end{longtable}
+\endgroup
+
+Khóa bí mật dùng để ký mã QR động chỉ tồn tại tại Central Application Server và được lưu trong kho khóa của trung tâm. Factory Edge Server chỉ nhận khóa công khai tương ứng qua chiều đồng bộ xuống. Khi cần thay khóa, khóa mới được phát hành kèm mã định danh khóa; khóa cũ và khóa mới được chấp nhận song song trong một khoảng thời gian ngắn để không làm gián đoạn việc ra vào.
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Trong các kết nối ở Bảng~\ref{tab:network}, đường truyền WAN qua VPN là đoạn dễ gián đoạn nhất; kiến trúc vật lý không đặt đoạn này trên đường xử lý lượt quét, nên vấn đề \textit{mất kết nối} chỉ ảnh hưởng đến việc đồng bộ. Đối với vấn đề \textit{mã QR tĩnh}, việc chỉ đặt khóa bí mật tại trung tâm bảo đảm rằng kể cả khi một máy chủ biên hoặc kiosk tại nhà máy bị đánh cắp, kẻ tấn công cũng không thể tự tạo mã QR hợp lệ; chứng chỉ thiết bị của node bị mất có thể bị thu hồi để chặn node đó gửi dữ liệu lên trung tâm.
+
+\subsubsection{Bước 5: Kiểm chứng kiến trúc vật lý}\label{sec:physical-step5}
+Kiến trúc vật lý được kiểm chứng theo ba khía cạnh: thời gian xử lý một lượt quét, tải và dung lượng, và hành vi khi xảy ra sự cố.
+
+\paragraph{Ngân sách thời gian của luồng quét.} Bảng~\ref{tab:time-budget} ước lượng thời gian của từng đoạn trên đường xử lý một lượt quét. Trong trường hợp bình thường, tổng thời gian khoảng 1,1 giây; trong trường hợp xấu nhất, khi cổng xoay không phản hồi và hết giới hạn chờ, kiosk vẫn hiển thị kết quả mở cổng thất bại sau khoảng 1,3 giây, đáp ứng NFR-PER-01 và NFR-AVL-03.
+
+\begin{table}[H]
+\centering
+\caption{Ngân sách thời gian của luồng quét}\label{tab:time-budget}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.4cm}|>{\centering\arraybackslash}p{2.4cm}|>{\centering\arraybackslash}p{2.4cm}|}
+\hline
+\textbf{Đoạn xử lý} & \textbf{Node} & \textbf{Bình thường} & \textbf{Xấu nhất} \\
+\hline
+Máy quét đọc mã QR & Gate Kiosk Terminal & 300 ms & 300 ms \\
+\hline
+Gửi yêu cầu tới máy chủ biên qua LAN & Kiosk $\rightarrow$ Edge Server & 20 ms & 20 ms \\
+\hline
+Xác thực mã QR (chữ ký, thời hạn, tra cứu cục bộ) & Factory Edge Server & 50 ms & 50 ms \\
+\hline
+Ghi bền vững lượt quét & Factory Edge Server & 50 ms & 50 ms \\
+\hline
+Gọi API cổng xoay & Edge Server $\rightarrow$ Turnstile Controller & 500 ms (A-04) & 800 ms (giới hạn chờ) \\
+\hline
+Ghi giao dịch và outbox (chỉ khi cổng xác nhận) & Factory Edge Server & 50 ms & -- \\
+\hline
+Trả kết quả và hiển thị & Edge Server $\rightarrow$ Kiosk & 100 ms & 100 ms \\
+\hline
+\textbf{Tổng} & & \textbf{$\approx$ 1,07 s} & \textbf{$\approx$ 1,32 s} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\paragraph{Tải và dung lượng.} Với khoảng 1.400 nhân viên, mỗi người hai lượt quét một ngày, hệ thống phát sinh khoảng 2.800 lượt quét mỗi ngày (khoảng 1.600 tại Bình Dương và 1.200 tại Long An), tương đương khoảng 73.000 giao dịch mỗi tháng với 26 ngày làm việc. Với kích thước khoảng 0,5 KB mỗi bản ghi lượt quét hoặc giao dịch, dữ liệu tăng khoảng 75 MB mỗi tháng và dưới 1 GB mỗi năm, nằm trong khả năng của một máy chủ PostgreSQL thông thường. Trong trường hợp mất kết nối trọn một ngưỡng 8 giờ bao gồm một lần giao ca, outbox của một nhà máy chứa không quá khoảng 1.600 sự kiện (dưới 1 MB) và được gửi bù trong vài giây khi kết nối trở lại. Tải đỉnh tại máy chủ biên là 2--5 lượt quét mỗi giây, thấp hơn nhiều so với khả năng ghi của SQLite trên SSD.
+
+\paragraph{Phân tích chế độ lỗi.} Bảng~\ref{tab:failure-modes} xem xét hành vi của hệ thống khi từng phần tử gặp sự cố.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{5.4cm}|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash}p{2.2cm}|}
+\caption{Phân tích chế độ lỗi của kiến trúc vật lý}\label{tab:failure-modes}\\
+\hline
+\textbf{Sự cố} & \textbf{Hành vi của hệ thống} & \textbf{Cơ chế} & \textbf{Yêu cầu} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Sự cố} & \textbf{Hành vi của hệ thống} & \textbf{Cơ chế} & \textbf{Yêu cầu} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Mất kết nối WAN giữa nhà máy và trung tâm & Cổng tiếp tục hoạt động trong ngưỡng 8 giờ; quá ngưỡng thì chiều vào chỉ mở thủ công, chiều ra luôn được phép; trung tâm cảnh báo khi mất heartbeat & Kho cục bộ và outbox (G3), gửi bù (G4), ngưỡng cấu hình (C9) & FR-17, NFR-AVL-04, NFR-REL-03 \\
+\hline
+Gián đoạn ngay trong lúc xử lý một lượt quét (máy chủ biên khởi động lại) & Lượt quét đã được ghi ở trạng thái chờ xác nhận; khi khởi động lại, các lượt này được đưa lên bảng điều khiển của bảo vệ để đối soát & Ghi lượt quét trước khi gọi cổng (INV-05) & NFR-REL-03, R-05 \\
+\hline
+Factory Edge Server chính hỏng & Node dự phòng tiếp quản; trong thời gian chuyển đổi, bảo vệ mở cổng thủ công & Sao chép dữ liệu cục bộ liên tục sang node dự phòng & NFR-REL-03 \\
+\hline
+Cổng xoay không phản hồi & Sau giới hạn chờ, kiosk không báo thành công; lượt quét được ghi là mở cổng thất bại; kiểm tra trạng thái cổng trước khi gửi lại lệnh; sau nhiều lỗi liên tiếp, ngừng gửi lệnh tự động và cảnh báo bảo vệ & Giới hạn thời gian chờ, kiểm tra trạng thái, circuit breaker (G2) & NFR-AVL-03, NFR-REL-02 \\
+\hline
+Một Central Application Server hỏng & Node còn lại tiếp tục phục vụ, việc cấp mã QR động không bị gián đoạn & Hai node chạy song song sau Reverse Proxy & NFR-SEC-05 \\
+\hline
+Toàn bộ trung tâm ngừng hoạt động & Cổng vẫn xác thực được các mã đã cấp nhưng nhân viên không lấy được mã mới; bảo vệ mở cổng thủ công, HR bổ sung chấm công sau & Mở cổng thủ công (G5), điều chỉnh chấm công (C4) & FR-10, FR-16 \\
+\hline
+HR/Payroll không phản hồi khi truyền dữ liệu & Gửi lại theo exponential backoff; cảnh báo khi gần hạn; nhân viên HR có thể gửi lại thủ công & Outbox trung tâm, theo dõi trạng thái đợt truyền (C4, C5) & NFR-REL-01, NFR-REL-04, NFR-INT-02 \\
+\hline
+Điện thoại của nhân viên mất kết nối mạng & Nhân viên không lấy được mã QR mới; bảo vệ mở cổng thủ công và HR bổ sung chấm công & Mở cổng thủ công (G5), điều chỉnh chấm công (C4) & FR-10, FR-16 \\
+\hline
+Thiết bị tại nhà máy bị đánh cắp & Dữ liệu cục bộ không đọc được; không thể tạo mã QR hợp lệ; thiết bị bị chặn kết nối lên trung tâm & Mã hóa dữ liệu cục bộ, khóa bí mật chỉ đặt tại trung tâm, thu hồi chứng chỉ thiết bị & NFR-PRI-01, NFR-SEC-02 \\
+\hline
+\end{longtable}
+\endgroup
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Bảng~\ref{tab:failure-modes} cho thấy vấn đề \textit{mất kết nối} đã được xem xét ở mọi đoạn trên đường đi của một giao dịch chấm công: giữa điện thoại của nhân viên và trung tâm, giữa nhà máy và trung tâm, giữa máy chủ biên và cổng xoay, giữa trung tâm và HR/Payroll, và ngay trong lúc xử lý một lượt quét. Ở mỗi đoạn, hệ thống hoặc tự xử lý được, hoặc chuyển sang thao tác thủ công có kiểm soát và để lại dấu vết để đối soát, không có trường hợp nào giao dịch bị mất mà không được phát hiện. Đối với vấn đề \textit{mã QR tĩnh}, phân tích chế độ lỗi chỉ ra đánh đổi của việc dùng mã QR động: việc cấp mã phụ thuộc vào trung tâm, nên trung tâm được triển khai hai node chạy song song để giảm rủi ro này.
+
+\subsection{Các góc nhìn kiến trúc}\label{sec:views}
+Kiến trúc của hệ thống được trình bày theo cách tiếp cận \textit{Views and Beyond}~\cite{clements2010documenting}, trong đó mỗi góc nhìn trả lời một nhóm câu hỏi riêng cho một nhóm người quan tâm. Bảng~\ref{tab:view-types} tóm tắt ba loại góc nhìn được sử dụng.
+
+\begin{table}[H]
+\centering
+\caption{Các loại góc nhìn kiến trúc được sử dụng}\label{tab:view-types}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{2.6cm}|}
+\hline
+\textbf{Loại góc nhìn} & \textbf{Câu hỏi trả lời} & \textbf{Phần tử} & \textbf{Quan hệ} & \textbf{Người quan tâm chính} \\
+\hline
+Module views & Mã nguồn được tổ chức thành những đơn vị nào và các đơn vị phụ thuộc nhau ra sao? & Module (package) & Chứa, phụ thuộc, phân tầng & Lập trình viên, người bảo trì \\
+\hline
+Component-and-connector views & Khi hệ thống chạy, có những component nào, tương tác qua connector nào và theo trình tự nào? & Component, connector & Gắn kết, trình tự tương tác & Kiến trúc sư, người kiểm thử \\
+\hline
+Allocation views & Phần mềm được đặt lên hạ tầng nào, được tổ chức thành tệp nào và giao cho ai phát triển? & Node, artifact, thành viên & Triển khai trên, hiện thực bởi, giao cho & Đội vận hành, người quản lý dự án \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Module views}\label{sec:module-views}
+Module views được trình bày bằng lược đồ gói (package diagram) UML với hai loại quan hệ: quan hệ chứa (package nằm trong package) và quan hệ phụ thuộc (đường nét đứt có đầu mũi tên mở, đi từ package sử dụng tới package được sử dụng). Ba góc nhìn module được sử dụng: decomposition view, uses view và layered view.
+
+\paragraph{Decomposition view.} Hình~\ref{fig:module-decomposition} thể hiện cách mã nguồn được phân rã. Ở cấp cao nhất, \texttt{tmc} gồm ba package: \texttt{gate-agent} là mã nguồn của Gate Quantum, \texttt{central} là mã nguồn của Central Quantum, và \texttt{sync-contract} là hợp đồng dữ liệu dùng chung giữa hai quantum. Mỗi package con của \texttt{gate-agent} và \texttt{central} tương ứng đúng một component ở Bảng~\ref{tab:components}, như liệt kê trong Bảng~\ref{tab:module-catalog}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/06_architecture_structure/module_decomposition.png}
+\caption{Decomposition view của hệ thống TMC}
+\label{fig:module-decomposition}
+\end{figure}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.9cm}|>{\centering\arraybackslash}p{2.1cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
+\caption{Danh mục package và component tương ứng}\label{tab:module-catalog}\\
+\hline
+\textbf{Package} & \textbf{Component} & \textbf{Trách nhiệm} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Package} & \textbf{Component} & \textbf{Trách nhiệm} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\texttt{sync-contract} & -- & Định nghĩa dữ liệu trao đổi giữa hai quantum (lô sự kiện chiều lên; credential, khóa công khai, cấu hình trạm chiều xuống), có quản lý phiên bản \\
+\hline
+\multicolumn{3}{|l|}{\texttt{gate-agent}} \\
+\hline
+\texttt{access} & G1 & Xác thực mã QR, điều phối luồng quét, áp dụng các bất biến tại cổng \\
+\hline
+\texttt{turnstile} & G2 & Adapter tới hệ thống cổng xoay, mỗi nhà cung cấp một cài đặt \\
+\hline
+\texttt{localstore} & G3 & Lưu trữ cục bộ và outbox \\
+\hline
+\texttt{sync} & G4 & Đồng bộ hai chiều với trung tâm, heartbeat \\
+\hline
+\texttt{guard} & G5 & Bảng điều khiển của bảo vệ, mở cổng thủ công \\
+\hline
+\multicolumn{3}{|l|}{\texttt{central}} \\
+\hline
+\texttt{ingestion} & C1 & Tiếp nhận dữ liệu từ Gate Agent, cung cấp dữ liệu tham chiếu cho Gate Agent \\
+\hline
+\texttt{employee} & C2 & Hồ sơ nhân viên, QR credential, ký mã QR động \\
+\hline
+\texttt{station} & C3 & Trạm cổng, trạng thái trạm, nhật ký mở cổng thủ công \\
+\hline
+\texttt{period} & C4 & Điều chỉnh chấm công, kỳ chấm công, đợt truyền \\
+\hline
+\texttt{hrpayroll} & C5 & Adapter tới hệ thống HR/Payroll (hai chiều) \\
+\hline
+\texttt{reporting} & C6 & Read model, báo cáo, xuất Excel \\
+\hline
+\texttt{iam} & C7 & Tài khoản, vai trò, quyền, kiểm tra quyền \\
+\hline
+\texttt{audit} & C8 & Nhật ký kiểm toán \\
+\hline
+\texttt{config} & C9 & Tham số vận hành, lịch làm việc \\
+\hline
+\end{longtable}
+\endgroup
+
+\paragraph{Uses view.} Hình~\ref{fig:module-uses} thể hiện quan hệ phụ thuộc giữa các package. Chiều phụ thuộc đi từ package sử dụng tới package được sử dụng: một package phụ thuộc package khác khi gọi interface trong package \texttt{api} của package đó, hoặc khi đăng ký nhận domain event do package đó công bố. Ví dụ, \texttt{period} đăng ký nhận sự kiện \texttt{TransactionRecorded} của \texttt{ingestion} nên \texttt{period} phụ thuộc \texttt{ingestion}. Các quy tắc phụ thuộc gồm:
+\begin{enumerate}
+    \item \texttt{gate-agent} và \texttt{central} không phụ thuộc lẫn nhau; hai bên chỉ cùng phụ thuộc \texttt{sync-contract}. Nhờ đó hai quantum được biên dịch và triển khai độc lập.
+    \item Một package chỉ được dùng package khác qua package \texttt{api} công khai hoặc qua domain event; không package nào được truy cập trực tiếp dữ liệu do package khác sở hữu (cột \textit{Dữ liệu sở hữu} ở Bảng~\ref{tab:components}).
+    \item Không có vòng phụ thuộc. Để giữ quy tắc này, \texttt{ingestion} gọi interface của \texttt{station} để ghi heartbeat và lần mở cổng thủ công nhận từ Gate Agent, và \texttt{hrpayroll} gọi interface của \texttt{employee} để cập nhật dữ liệu nhân viên nhận từ HR/Payroll, thay vì phát sự kiện theo chiều ngược lại.
+    \item \texttt{iam} và \texttt{audit} là các package dùng chung: mọi package nghiệp vụ của \texttt{central} phụ thuộc \texttt{iam} để kiểm tra quyền tại package \texttt{api}; các package có thao tác cần kiểm toán (\texttt{employee}, \texttt{station}, \texttt{period}, \texttt{hrpayroll}, \texttt{config}, \texttt{iam}) phụ thuộc \texttt{audit}. \texttt{iam} và \texttt{audit} không phụ thuộc package nghiệp vụ nào. Để hình dễ đọc, các phụ thuộc tới \texttt{iam} và \texttt{audit} không được vẽ trong Hình~\ref{fig:module-uses}.
+    \item Các quy tắc trên được kiểm tra tự động bằng kiểm thử kiến trúc trong quy trình build (ADR-07).
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/06_architecture_structure/module_uses.png}
+\caption{Uses view của hệ thống TMC}
+\label{fig:module-uses}
+\end{figure}
+
+\paragraph{Layered view.} Bên trong mỗi package ở Bảng~\ref{tab:module-catalog}, mã nguồn được chia thành bốn tầng theo kiểu ports and adapters. Hình~\ref{fig:module-layers} thể hiện cấu trúc này với package \texttt{access}; các package khác có cùng cấu trúc.
+\begin{itemize}
+    \item \texttt{api}: điểm vào của package (endpoint, interface công khai cho package khác); chỉ phụ thuộc \texttt{application}.
+    \item \texttt{application}: các use case điều phối nghiệp vụ, ví dụ use case xử lý một lượt quét; phụ thuộc \texttt{domain}.
+    \item \texttt{domain}: thực thể, quy tắc nghiệp vụ, bất biến và các port (interface) mà package cần từ bên ngoài, ví dụ \texttt{TurnstileGateway}, \texttt{TransactionStore}, \texttt{QrTokenVerifier}; không phụ thuộc tầng nào khác.
+    \item \texttt{infrastructure}: các adapter cài đặt port của \texttt{domain}, phụ thuộc \texttt{domain}. Ví dụ, kho dữ liệu SQLite là một adapter cài đặt port \texttt{TransactionStore}.
+\end{itemize}
+Vì \texttt{domain} không phụ thuộc \texttt{infrastructure}, việc thay đổi công nghệ lưu trữ, nhà cung cấp cổng xoay hay API của hệ thống bên ngoài chỉ ảnh hưởng tới \texttt{infrastructure} (NFR-MOD-01).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.45\textwidth]{figures/06_architecture_structure/module_layers.png}
+\caption{Layered view bên trong package \texttt{access}}
+\label{fig:module-layers}
+\end{figure}
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Uses view cho thấy \texttt{gate-agent} không phụ thuộc \texttt{central} ở mức mã nguồn, chỉ phụ thuộc \texttt{sync-contract}; đây là điều kiện để Gate Agent chạy độc lập khi mất kết nối. Layered view cho thấy việc kiểm tra mã QR động được đặt sau port \texttt{QrTokenVerifier} trong \texttt{access::domain}, nên nếu cần đổi cơ chế chống lộ mã QR (ví dụ đổi thuật toán ký hoặc thời hạn mã), chỉ cần thay cài đặt của port này mà không ảnh hưởng tới luồng xử lý lượt quét.
+
+\subsubsection{Component-and-connector views}\label{sec:cc-views}
+Component-and-connector views mô tả hệ thống khi đang chạy: các component, các interface mà chúng cung cấp và sử dụng, và trình tự tương tác giữa chúng trong các luồng chính.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/06_architecture_structure/component_diagram.png}
+\caption{Lược đồ component của hệ thống TMC}
+\label{fig:component-diagram}
+\end{figure}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{6.6cm}|}
+\caption{Các interface trong lược đồ component}\label{tab:interfaces}\\
+\hline
+\textbf{Interface} & \textbf{Cung cấp bởi} & \textbf{Sử dụng bởi} & \textbf{Kiểu giao tiếp} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Interface} & \textbf{Cung cấp bởi} & \textbf{Sử dụng bởi} & \textbf{Kiểu giao tiếp} \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\texttt{ScanService} & G1 & Giao diện kiosk & Đồng bộ, cục bộ \\
+\hline
+\texttt{LocalStore} & G3 & G1, G4, G5 & Đồng bộ, cục bộ, ghi bền vững \\
+\hline
+\texttt{TurnstileGateway} & G2 & G1, G5 & Đồng bộ, có giới hạn thời gian chờ \\
+\hline
+\texttt{TurnstileAPI} & Turnstile Controller & G2 & Đồng bộ, mạng LAN nhà máy \\
+\hline
+\texttt{SyncAPI} & C1 & G4 & Bất đồng bộ qua outbox (chiều lên); Gate Agent kéo định kỳ (chiều xuống) \\
+\hline
+\texttt{IngestionAPI} & C1 & C4, C6 & Sự kiện trong tiến trình \\
+\hline
+\texttt{StationAPI} & C3 & C1 & Sự kiện và lời gọi trong tiến trình \\
+\hline
+\texttt{EmployeeAPI} & C2 & C1, C5 & Sự kiện trong tiến trình (C1); lời gọi trong tiến trình (C5) \\
+\hline
+\texttt{QrTokenAPI} & C2 & TMC Employee Portal & Đồng bộ, HTTPS \\
+\hline
+\texttt{PeriodAPI} & C4 & C5, C6 & Bất đồng bộ qua outbox trung tâm (C5); sự kiện trong tiến trình (C6) \\
+\hline
+\texttt{ConfigAPI} & C9 & C1, C4, C6 & Sự kiện và lời gọi trong tiến trình \\
+\hline
+\texttt{HRPayrollAPI} & HR/Payroll & C5 & Bất đồng bộ theo lô, gửi lại khi lỗi \\
+\hline
+\texttt{AuthAPI} & C7 & Các module của Central & Lời gọi trong tiến trình \\
+\hline
+\texttt{AuditAPI} & C8 & Các module của Central & Lời gọi trong tiến trình, ghi bền vững \\
+\hline
+\end{longtable}
+\endgroup
+
+\paragraph{Góc nhìn hành vi.} Ba lược đồ tuần tự dưới đây mô tả trình tự tương tác giữa các component trong ba luồng chính. Tên các message tương ứng với các interface ở Bảng~\ref{tab:interfaces}.
+
+\textbf{F1 -- Quét mã QR qua cổng} (Hình~\ref{fig:seq-f1}). G1 kiểm tra chữ ký và thời hạn của mã QR, tra cứu credential trong G3 và kiểm tra các quy tắc tại cổng (trạm đang bật, nhân viên đang hoạt động, chống quẹt lặp chiều, mã chưa được sử dụng). Nếu hợp lệ, G1 ghi lượt quét ở trạng thái chờ xác nhận trước khi gọi G2 mở cổng. Chỉ khi cổng xoay xác nhận mở, G1 mới ghi giao dịch chấm công cùng bản ghi outbox trong một giao dịch cục bộ và trả kết quả chấp nhận cho kiosk (INV-05). Nếu cổng xoay không phản hồi trong giới hạn chờ hoặc báo lỗi, lượt quét được đánh dấu mở cổng thất bại và kiosk không báo thành công (NFR-AVL-03). Nếu mã không hợp lệ, lượt quét được ghi kèm lý do từ chối và không tạo giao dịch (INV-07). Ngân sách thời gian của luồng này được phân tích ở Bảng~\ref{tab:time-budget}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/06_architecture_structure/seq_f1_scan.png}
+\caption{Lược đồ tuần tự luồng F1 -- quét mã QR qua cổng}
+\label{fig:seq-f1}
+\end{figure}
+
+\textbf{F2 -- Đồng bộ giữa Gate Agent và Central} (Hình~\ref{fig:seq-f2}). Ở mỗi chu kỳ đồng bộ, G4 đọc các bản ghi chưa đồng bộ trong outbox. Khi có kết nối, G4 gửi lô sự kiện lên C1; C1 lưu theo mã sự kiện, bỏ qua bản ghi trùng (INV-06) và trả xác nhận; G4 chỉ đánh dấu đã đồng bộ các bản ghi được xác nhận. Tiếp đó G4 kéo phần thay đổi của dữ liệu tham chiếu (credential, khóa công khai, cấu hình trạm) và áp dụng vào G3, bảo đảm độ trễ $\le$ 60 giây (NFR-SEC-06); cuối cùng G4 gửi heartbeat để C3 cập nhật trạng thái trạm. Khi mất kết nối, các bản ghi tiếp tục nằm trong outbox và được gửi ở chu kỳ sau. Hành vi của Gate Agent theo thời gian mất kết nối được tóm tắt ở Bảng~\ref{tab:gate-connection-states}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/06_architecture_structure/seq_f2_sync.png}
+\caption{Lược đồ tuần tự luồng F2 -- đồng bộ giữa Gate Agent và Central}
+\label{fig:seq-f2}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Hành vi của Gate Agent theo trạng thái kết nối với Central}\label{tab:gate-connection-states}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.8cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 \hline
 \textbf{Trạng thái} & \textbf{Chiều vào} & \textbf{Chiều ra} \\
 \hline
-Có kết nối & Bình thường; danh sách QR hợp lệ cập nhật với độ trễ $\le$ 60 giây & Bình thường \\
+Có kết nối & Hoạt động bình thường; dữ liệu tham chiếu được cập nhật với độ trễ $\le$ 60 giây & Hoạt động bình thường \\
 \hline
-Mất kết nối, chưa quá ngưỡng (ngưỡng đặt ở C9) & Vẫn hoạt động bằng dữ liệu cục bộ; dữ liệu tích lại trong outbox; C3 cảnh báo khi mất heartbeat & Bình thường \\
+Mất kết nối, chưa quá ngưỡng (mặc định 8 giờ, cấu hình tại C9 theo FR-28) & Tiếp tục xác thực bằng dữ liệu cục bộ; dữ liệu tích lũy trong outbox; C3 cảnh báo khi mất heartbeat & Hoạt động bình thường \\
 \hline
-Mất kết nối, quá ngưỡng & Fail-closed: cổng không tự mở; bảo vệ mở thủ công qua G5 (FR-09, bắt buộc lý do, có audit) & Luôn cho ra vì an toàn cháy nổ; lần quét vẫn được ghi để chấm công \\
+Mất kết nối, quá ngưỡng & Cổng không tự mở; bảo vệ mở cổng thủ công qua G5, bắt buộc nhập lý do (FR-10) & Luôn cho ra vì lý do an toàn; lượt quét vẫn được ghi để chấm công \\
 \hline
 \end{tabularx}
 \end{table}
 
-Giá trị ngưỡng mất kết nối sẽ được chốt cùng giảng viên, như đã nêu ở mục 5.2. Khi có mạng trở lại, luồng F2 gửi bù toàn bộ outbox; eventId bảo đảm không tạo bản ghi trùng.
-
-\subsection{Kiến trúc vật lý}\label{sec:physical-architecture}
-Kiến trúc vật lý xác định cách thức các thành phần Component được ánh xạ và triển khai trên Nodes, môi trường thực thi, cấu hình mạng và đường truyền vật lý, nhằm hiện thực hóa các mục tiêu về hiệu năng, độ tin cậy không mất mát dữ liệu và tính sẵn sàng/ khả năng tự vận hành offline.
-
-\subsubsection{Lựa chọn Topology triển khai}
-Hệ thống TMC được quyết định triển khai theo mô hình Hybrid Edge-Central Topology (Kết hợp điện toán biên tại nhà máy và điện toán tập trung tại máy chủ trung tâm):  
-
-Phần xử lý tại từng nhà máy (Edge - Gate Quantum Q1):
-\begin{itemize}
-    \item Toàn bộ phần mềm quét mã, xác thực và điều khiển mở cổng được cài đặt trực tiếp trên máy tính tại trạm cổng (Kiosk) của 2 nhà máy (Bình Dương và Long An).
-    \item Mục đích: Xử lý ngay tại mạng nội bộ để đảm bảo tốc độ phản hồi cực nhanh ($\le$ 2 giây - NFR-01), giải quyết triệt để bài toán ùn tắc giờ cao điểm đổi ca, đồng thời giúp cổng vẫn tự hoạt động bình thường kể cả khi mất kết nối Internet về trung tâm (NFR-07, NFR-10).
-\end{itemize}
-
-Phần xử lý tập trung (Central - Central Quantum Q2):
-\begin{itemize}
-    \item Toàn bộ phần mềm quản lý nhân sự, phân quyền người dùng (RBAC), lưu trữ dữ liệu tổng và đối soát lương được đặt tập trung trên máy chủ trung tâm (Cloud / Datacenter).
-    \item Mục đích: Đảm bảo an toàn, nhất quán dữ liệu và kiểm toán tập trung (NFR-02, NFR-04, NFR-05), phục vụ việc tổng hợp báo cáo và truyền dữ liệu sang hệ thống HR/Payroll đúng hạn chốt lương hằng tháng (C-02, NFR-03).
-\end{itemize}
-
-\subsubsection{Sơ đồ triển khai vật lý}
-Sơ đồ triển khai dưới đây mô tả cấu trúc vật lý, vị trí của từng thành phần, ranh giới mạng và phương thức liên kết giữa các hệ thống:
+\textbf{F3 -- Chốt kỳ và truyền dữ liệu sang HR/Payroll} (Hình~\ref{fig:seq-f3}). Đến thời điểm chốt kỳ theo lịch cấu hình (FR-28), C4 kiểm tra trạng thái đồng bộ của các Gate Agent qua C1 để bảo đảm không còn giao dịch nằm trong outbox của nhà máy nào, chuyển kỳ sang trạng thái CLOSED, tạo đợt truyền chính và thông báo bất đồng bộ cho C5 qua outbox trung tâm. C5 gửi đợt truyền sang HR/Payroll; nếu thành công, C5 báo cho C4 để chuyển kỳ sang trạng thái LOCKED; nếu lỗi, C5 lên lịch gửi lại theo exponential backoff (NFR-REL-01). Lịch chốt được đặt đủ sớm để còn thời gian gửi lại trước 12:00 ngày 1 (NFR-INT-02). Sau khi kỳ đã khóa, mọi điều chỉnh và giao dịch đồng bộ về muộn của kỳ đó đi vào đợt truyền bổ sung theo cùng trình tự (INV-09).
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/06_architecture_structure/deployment_diagram.png} 
-\caption{Sơ đồ triển khai vật lý hệ thống TMC}
+\includegraphics[width=0.9\textwidth]{figures/06_architecture_structure/seq_f3_period_close.png}
+\caption{Lược đồ tuần tự luồng F3 -- chốt kỳ và truyền dữ liệu sang HR/Payroll}
+\label{fig:seq-f3}
 \end{figure}
 
-\subsubsection{Đặc tả chi tiết các Node và Phân bổ Component}
-Bảng dưới đây quy định chi tiết cấu hình phần cứng, vai trò môi trường và các component được triển khai trên từng nút mạng:
+\textbf{F5 -- Đồng bộ dữ liệu nhân viên.} Định kỳ, C5 lấy phần thay đổi dữ liệu nhân viên từ HR/Payroll và gọi interface của C2 để cập nhật hồ sơ. Khi một nhân viên chuyển sang trạng thái không hoạt động, C2 thu hồi QR credential đang hiệu lực và phát sự kiện thay đổi credential; C1 đưa thay đổi này vào dữ liệu tham chiếu để các Gate Agent kéo về ở chu kỳ đồng bộ tiếp theo của luồng F2. Luồng này có cấu trúc tương tự F3 nên không được vẽ thành lược đồ riêng.
 
+\paragraph{Liên hệ với vấn đề phát sinh.} Lược đồ component cho thấy interface duy nhất nối Gate Agent với Central là \texttt{SyncAPI}, được sử dụng bất đồng bộ, còn mọi interface mà G1 cần để cho một nhân viên qua cổng đều nằm trong Gate Agent. Lược đồ F1 cho thấy không có message nào gửi tới Central trong lúc xử lý một lượt quét, và việc ghi lượt quét trước khi gọi cổng xoay bảo đảm không mất dấu vết nếu gián đoạn xảy ra giữa chừng. Lược đồ F2 cho thấy khi mất kết nối, dữ liệu chỉ tiếp tục nằm trong outbox và được gửi bù không trùng lặp khi kết nối trở lại. Đối với vấn đề mã QR tĩnh, \texttt{QrTokenAPI} của C2 là điểm duy nhất phát hành mã QR; ở bước đầu tiên của F1, mã bị lộ đã hết hạn hoặc đã được sử dụng sẽ bị từ chối mà không cần liên lạc với trung tâm.
+
+\subsubsection{Allocation views}\label{sec:allocation-views}
+Allocation views ánh xạ các phần tử phần mềm vào môi trường bên ngoài phần mềm: hạ tầng thực thi (deployment view), cấu trúc tệp mã nguồn và sản phẩm build (implementation view), và tổ chức nhóm phát triển (work assignment view).
+
+\paragraph{Deployment view.} Hình~\ref{fig:deployment-diagram} là lược đồ triển khai UML của hệ thống. Các node tương ứng với Bảng~\ref{tab:nodes}; các artifact được triển khai như sau:
+\begin{itemize}
+    \item \texttt{gate-agent}: container image chứa G1--G5, chạy trên Factory Edge Server. Mỗi nhà máy có hai Factory Edge Server (chính và dự phòng nóng).
+    \item \texttt{gate-local.db}: tệp CSDL SQLite được mã hóa, chứa dữ liệu của G3; được sao chép liên tục sang node dự phòng.
+    \item \texttt{central}: container image chứa C1--C9, chạy trên hai Central Application Server song song.
+    \item \texttt{tmc-db}: CSDL PostgreSQL của Central, có bản sao dự phòng.
+\end{itemize}
+Gate Kiosk Terminal, Guard Desk Terminal và User Workstation không chứa artifact của hệ thống; các thiết bị này chỉ chạy trình duyệt để truy cập giao diện do Gate Agent hoặc Central cung cấp. Giao thức và biện pháp bảo vệ của từng communication path được nêu ở Bảng~\ref{tab:network}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/06_architecture_structure/deployment_diagram.png}
+\caption{Lược đồ triển khai của hệ thống TMC}
+\label{fig:deployment-diagram}
+\end{figure}
+
+\paragraph{Implementation view.} Bảng~\ref{tab:implementation-view} ánh xạ các package ở Hình~\ref{fig:module-decomposition} vào thư mục mã nguồn trong kho mã \texttt{tmc} và artifact được tạo ra khi build.
+
+\begin{table}[H]
+\centering
+\caption{Implementation view: package, thư mục mã nguồn và artifact}\label{tab:implementation-view}
 \small
 \renewcommand{\arraystretch}{1.3}
-\begin{longtable}{|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{7.2cm}|}
-\caption{Đặc tả chi tiết các Node và Phân bổ Component} \\
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.2cm}|}
 \hline
-\textbf{Tên Node} & \textbf{Môi trường / Phần cứng} & \textbf{Component đảm nhận} & \textbf{Vai trò và Đặc tính kỹ thuật} \\
+\textbf{Package} & \textbf{Thư mục mã nguồn} & \textbf{Artifact} & \textbf{Node} \\
+\hline
+\texttt{sync-contract} & \texttt{tmc/sync-contract} & Thư viện dùng chung, được đóng gói vào cả \texttt{gate-agent} và \texttt{central} & -- \\
+\hline
+\texttt{gate-agent} và 5 package con & \texttt{tmc/gate-agent} & Container image \texttt{gate-agent}; tệp \texttt{gate-local.db} được tạo khi chạy & Factory Edge Server \\
+\hline
+\texttt{central} và 9 package con & \texttt{tmc/central} & Container image \texttt{central} & Central Application Server \\
+\hline
+Giao diện người dùng (React) & \texttt{tmc/web} & Bản build tĩnh của giao diện kiosk và bảng điều khiển bảo vệ được đóng gói vào \texttt{gate-agent}; bản build của giao diện quản trị được đóng gói vào \texttt{central} & Factory Edge Server, Central Application Server \\
+\hline
+Lược đồ dữ liệu của các package trong \texttt{central} & \texttt{infrastructure} của từng package & Các script migration tạo \texttt{tmc-db} & Central Database Server \\
+\hline
+Cấu hình triển khai & \texttt{tmc/deploy} & Cấu hình Nginx, cấu hình container & Reverse Proxy Server và các node chạy container \\
+\hline
+\end{tabularx}
+\end{table}
+
+\paragraph{Work assignment view.} Công việc phát triển được chia theo ranh giới quantum và package để các nhóm làm việc song song mà ít phải sửa mã của nhau (Bảng~\ref{tab:work-assignment}). \texttt{sync-contract} do nhóm nền tảng quản lý, vì mọi thay đổi trên hợp đồng này ảnh hưởng đồng thời đến hai quantum và phải được quản lý phiên bản. Thành viên cụ thể của từng nhóm được trình bày ở phần hiện thực.
+
+\begin{table}[H]
+\centering
+\caption{Work assignment view: phân công theo nhóm}\label{tab:work-assignment}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{5.2cm}|}
+\hline
+\textbf{Nhóm} & \textbf{Package phụ trách} & \textbf{Đặc tính cần bảo đảm} \\
+\hline
+Nhóm Gate Agent & \texttt{access}, \texttt{turnstile}, \texttt{localstore}, \texttt{sync}, \texttt{guard} & Performance, Reliability, hoạt động khi mất kết nối \\
+\hline
+Nhóm Central -- nghiệp vụ lõi & \texttt{ingestion}, \texttt{employee}, \texttt{station}, \texttt{period} & Data Integrity, Security \\
+\hline
+Nhóm Central -- tích hợp và báo cáo & \texttt{hrpayroll}, \texttt{reporting}, \texttt{config} & Interoperability, Privacy \\
+\hline
+Nhóm nền tảng & \texttt{iam}, \texttt{audit}, \texttt{sync-contract}, cấu hình triển khai, kiểm thử kiến trúc & Security, Auditability, Modifiability \\
+\hline
+\end{tabularx}
+\end{table}
+
+\paragraph{Liên hệ với vấn đề phát sinh.} Deployment view cho thấy artifact \texttt{gate-agent} và dữ liệu \texttt{gate-local.db} cùng nằm trên Factory Edge Server tại nhà máy, nên việc ra vào không phụ thuộc vào communication path tới trung tâm; node dự phòng nóng giúp nhà máy không mất khả năng xử lý khi một máy chủ biên hỏng. Đối với vấn đề mã QR tĩnh, khóa bí mật dùng để ký mã QR chỉ nằm trong artifact \texttt{central} trên Central Application Server, còn artifact \texttt{gate-agent} chỉ nhận khóa công khai.
+
+\subsubsection{Ánh xạ giữa các góc nhìn}\label{sec:view-mapping}
+Bảng~\ref{tab:view-mapping} liên kết các phần tử của ba loại góc nhìn: mỗi component ở component-and-connector view được hiện thực bởi đúng một package ở module view, được đóng gói vào một artifact, triển khai trên một loại node và giao cho một nhóm phụ trách.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{4.1cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{3.0cm}|}
+\caption{Ánh xạ giữa component, package, artifact, node và nhóm phụ trách}\label{tab:view-mapping}\\
+\hline
+\textbf{Component} & \textbf{Package} & \textbf{Artifact} & \textbf{Node} & \textbf{Nhóm} \\
 \hline
 \endfirsthead
-
 \hline
-\textbf{Tên Node} & \textbf{Môi trường / Phần cứng} & \textbf{Component đảm nhận} & \textbf{Vai trò và Đặc tính kỹ thuật} \\
+\textbf{Component} & \textbf{Package} & \textbf{Artifact} & \textbf{Node} & \textbf{Nhóm} \\
 \hline
 \endhead
-
-\hline
-\multicolumn{4}{r}{\textit{Còn tiếp sang trang sau...}} \\
 \hline
 \endfoot
-
-\hline
 \endlastfoot
-
-Gate Station Kiosk Node (Tại mỗi cổng/nhà máy) & Industrial Mini PC (Linux Ubuntu Core / Alpine), RAM 4GB, 64GB SSD, Dual NIC (Ethernet). Gắn máy quét QR quang học và màn hình phụ. & G1 (Access Control), G2 (Turnstile Adapter), G3 (Local Store \& Outbox), G4 (Gate Sync Agent) & Chạy như một Service/Daemon độc lập trên Linux. Đảm bảo tính tự chủ tuyệt đối (DP-01). CSDL cục bộ dùng SQLite được mã hóa bằng SQLCipher (AES-256) để bảo vệ dữ liệu cục bộ (NFR-06). Giao tiếp quét mã qua cổng Serial RS-232 / USB HID với độ trễ $<$ 50ms. \\
+G1 Access Control & \texttt{access} & \texttt{gate-agent} & Factory Edge Server & Gate Agent \\
 \hline
-Guard Desk Terminal (Tại phòng bảo vệ) & Máy tính bảng công nghiệp / PC màn hình cảm ứng, kết nối mạng LAN nội bộ nhà máy. & G5 (Guard Console - Web Frontend) & Ứng dụng Web tĩnh gọn nhẹ (Single Page Application) phục vụ giám sát luồng quẹt thẻ thời gian thực, hiển thị các bản ghi bị từ chối và thực hiện chức năng mở cổng thủ công khi xảy ra sự cố ngoại lệ (FR-09). \\
+G2 Turnstile Adapter & \texttt{turnstile} & \texttt{gate-agent} & Factory Edge Server & Gate Agent \\
 \hline
-Turnstile Controller Node (Hệ thống ngoài) & Bộ điều khiển phần cứng của cổng xoay (PLC/Controller) do nhà cung cấp thiết bị lắp đặt. & Hệ thống Cổng xoay bên ngoài & Nhận tín hiệu điều khiển mở chốt cơ khí từ G2 qua giao thức TCP/IP Socket hoặc HTTP REST nội bộ LAN. Thời gian phản hồi phần cứng cam kết $\le$ 500ms (A-03). \\
+G3 Local Store \& Outbox & \texttt{localstore} & \texttt{gate-agent}, \texttt{gate-}\allowbreak\texttt{local.db} & Factory Edge Server & Gate Agent \\
 \hline
-DMZ Edge Gateway / Reverse Proxy (Trung tâm) & VM Linux cấu hình tối thiểu 2 vCPU, 4GB RAM, triển khai Nginx / HAProxy. & Reverse Proxy, SSL Termination, WAF & Đóng vai trò cổng vào duy nhất (Single Point of Ingress) cho Central Datacenter. Chấm dứt TLS 1.3, kiểm tra xác thực hai chiều mTLS đối với các Gate Agent (G4), định tuyến API và ngăn chặn tấn công DoS/DDoS. \\
+G4 Gate Sync Agent & \texttt{sync} & \texttt{gate-agent} & Factory Edge Server & Gate Agent \\
 \hline
-Central Application Server Node (Trung tâm) & Cluster Container (Docker/K8s) hoặc VM Linux 4 vCPU, 8GB-16GB RAM. & C1 đến C9 (Central Modular Monolith) & Thực thi toàn bộ logic điều phối trung tâm. Triển khai theo mô hình Modular Monolith, các module giao tiếp In-process qua Application Events. Tách biệt thread pool giữa Ingestion (C1), Xử lý nghiệp vụ (C2, C3, C4) và Báo cáo (C6). \\
+G5 Guard Console & \texttt{guard} & \texttt{gate-agent} & Factory Edge Server & Gate Agent \\
 \hline
-Central Database Server Node (Trung tâm) & Hệ quản trị CSDL Quan hệ PostgreSQL (Primary - Standby Replica). & Lưu trữ tập trung toàn bộ dữ liệu nghiệp vụ, Audit Log (C8), Read Model (C6) & Đảm bảo tính nhất quán mạnh (ACID) cho việc chốt kỳ, quản lý nhân viên, và lưu trữ lịch sử chấm công tập trung. Bảng audit\_log được cấu hình Append-Only và phân vùng theo thời gian (Partitioning by Month). \\
+C1 Gate Sync \& Ingestion & \texttt{ingestion} & \texttt{central} & Central Application Server & Central -- nghiệp vụ lõi \\
 \hline
-Central Cache Server Node (Trung tâm) & Redis Standalone / Cluster in-memory. & Cache danh mục QR hợp lệ, Session tài khoản RBAC & Tăng tốc độ đọc cho các tác vụ tra cứu QR của nhân viên và xác thực token JWT người dùng quản trị. \\
+C2 Employee \& QR Management & \texttt{employee} & \texttt{central} & Central Application Server & Central -- nghiệp vụ lõi \\
+\hline
+C3 Gate Station Management & \texttt{station} & \texttt{central} & Central Application Server & Central -- nghiệp vụ lõi \\
+\hline
+C4 Adjustment \& Period Closing & \texttt{period} & \texttt{central} & Central Application Server & Central -- nghiệp vụ lõi \\
+\hline
+C5 HR/Payroll Adapter & \texttt{hrpayroll} & \texttt{central} & Central Application Server & Central -- tích hợp và báo cáo \\
+\hline
+C6 Reporting \& Monitoring & \texttt{reporting} & \texttt{central} & Central Application Server & Central -- tích hợp và báo cáo \\
+\hline
+C7 IAM / RBAC & \texttt{iam} & \texttt{central} & Central Application Server & Nền tảng \\
+\hline
+C8 Audit Log & \texttt{audit} & \texttt{central} & Central Application Server & Nền tảng \\
+\hline
+C9 Configuration & \texttt{config} & \texttt{central} & Central Application Server & Central -- tích hợp và báo cáo \\
+\hline
+Dữ liệu của C1 -- C9 & -- & \texttt{tmc-db} & Central Database Server & Central (các nhóm) \\
+\hline
 \end{longtable}
-\normalsize
-
-\subsubsection{Phân vùng mạng và Giao thức giao tiếp}
-1. Mạng Cục bộ Nhà máy (Factory OT/LAN Network - Subnet riêng):
-\begin{itemize}
-    \item Kết nối giữa Kiosk và Turnstile Controller: Sử dụng mạng LAN cô lập vật lý hoặc VLAN chuyên dụng (VLAN IoT/OT). Giao thức điều khiển là HTTP/REST hoặc TCP Socket với địa chỉ IP tĩnh. Không cho phép truy cập Internet trực tiếp từ dải mạng này.
-    \item Giao tiếp giữa G5 (Guard Console) và Kiosk: HTTP/WebSocket cục bộ qua LAN.
-\end{itemize}
-
-2. Mạng Diện rộng Kết nối Nhà máy - Trung tâm (WAN / VPN Tunnel):
-\begin{itemize}
-    \item Kênh truyền từ G4 (Gate Sync Agent) tại các nhà máy lên C1 (Gate Sync \& Ingestion) tại Trung tâm được bảo vệ thông qua đường truyền Site-to-Site IPSec VPN hoặc kênh mã hóa HTTPS/TLS 1.3 trên nền Internet công cộng.
-    \item Cơ chế xác thực thiết bị: Sử dụng mTLS (Mutual TLS) với chứng chỉ số X.509 riêng biệt được nạp an toàn vào từng Kiosk phần cứng, ngăn chặn triệt để hành vi giả mạo Gate Agent để inject dữ liệu chấm công.
-\end{itemize}
-
-3. Mạng Tích hợp Hệ thống HR/Payroll:
-\begin{itemize}
-    \item C5 gọi sang API của Hệ thống HR/Payroll qua kênh truyền mạng riêng (Dedicated Leased Line / MPLS) hoặc HTTPS REST API bảo vệ bằng IP Whitelisting và OAuth 2.0 / Mutual TLS.
-\end{itemize}
-
-\subsection{Các góc nhìn kiến trúc}\label{sec:views}
-% TODO (gói D): module views, component-and-connector views, allocation views.
+\endgroup
