@@ -171,7 +171,7 @@ ADR-10 & Nền tảng công nghệ: Java và Spring Boot cho backend, React cho 
 \noindent\textbf{2. Quyết định.}
 \begin{itemize}
     \item \textbf{Cổng xoay:} domain của G1 định nghĩa port \texttt{TurnstileGateway}; mỗi nhà cung cấp có một adapter trong G2. Lời gọi mở cổng có giới hạn thời gian chờ 800 ms, lớn hơn thời gian phản hồi cam kết 500 ms (A-04). Khi hết thời gian chờ, G2 kiểm tra trạng thái cổng trước khi gửi lại lệnh (NFR-REL-02); không gửi lại theo backoff để tránh mở cổng hai lần. Sau năm lỗi liên tiếp, circuit breaker ngừng gửi lệnh tự động và cảnh báo bảo vệ để mở cổng thủ công (FR-10).
-    \item \textbf{HR/Payroll:} C5 cài đặt hai port \texttt{HrPayrollGateway} (gửi đợt dữ liệu chấm công) và \texttt{EmployeeSourceGateway} (nhận dữ liệu nhân viên, ADR-09). Đợt truyền được gửi bất đồng bộ, gửi lại theo exponential backoff (1, 2, 4, 8 phút\ldots) khi lỗi tạm thời (NFR-REL-01), idempotent theo mã đợt (NFR-INT-04). Nhân viên HR có thể theo dõi và gửi lại thủ công (FR-22); hệ thống cảnh báo khi gần hạn 12:00 ngày 1 mà đợt chính chưa được xác nhận.
+    \item \textbf{HR/Payroll:} C5 cài đặt hai port \texttt{HrPayroll\-Gateway} (gửi đợt dữ liệu chấm công) và \texttt{Employee\-Source\-Gateway} (nhận dữ liệu nhân viên, ADR-09). Đợt truyền được gửi bất đồng bộ, gửi lại theo exponential backoff (1, 2, 4, 8 phút\ldots) khi lỗi tạm thời (NFR-REL-01), idempotent theo mã đợt (NFR-INT-04). Nhân viên HR có thể theo dõi và gửi lại thủ công (FR-22); hệ thống cảnh báo khi gần hạn 12:00 ngày 1 mà đợt chính chưa được xác nhận.
 \end{itemize}
 
 \noindent\textbf{3. Hệ quả.}
@@ -247,7 +247,7 @@ ADR-10 & Nền tảng công nghệ: Java và Spring Boot cho backend, React cho 
 
 \noindent\textbf{2. Quyết định.}
 \begin{itemize}
-    \item C5 định kỳ (mặc định 15 phút, cấu hình tại C9) lấy phần thay đổi dữ liệu nhân viên qua port \texttt{EmployeeSourceGateway}, rồi gọi interface của C2 để cập nhật hồ sơ theo mã nhân viên; việc cập nhật là idempotent nên chạy lại không tạo dữ liệu trùng.
+    \item C5 định kỳ (mặc định 15 phút, cấu hình tại C9) lấy phần thay đổi dữ liệu nhân viên qua port \texttt{Employee\-Source\-Gateway}, rồi gọi interface của C2 để cập nhật hồ sơ theo mã nhân viên; việc cập nhật là idempotent nên chạy lại không tạo dữ liệu trùng.
     \item Khi nhân viên chuyển sang trạng thái không hoạt động, C2 thu hồi QR credential đang hiệu lực và thay đổi được phát xuống các trạm theo luồng đồng bộ chiều xuống.
     \item Khi API của HR/Payroll chưa sẵn sàng, nhân viên HR có thể cập nhật thủ công; mọi cập nhật được ghi nhật ký kiểm toán.
 \end{itemize}
