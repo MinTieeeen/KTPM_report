@@ -7,7 +7,7 @@ Dựa trên bối cảnh nghiệp vụ, các yêu cầu chức năng, yêu cầu
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{longtable}{|>{\centering\arraybackslash}p{0.65cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{4.7cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\centering\arraybackslash}p{1.8cm}|}
-\caption{Architecture Characteristics Worksheet} \\
+\caption{Architecture Characteristics Worksheet}\label{tab:ac-worksheet} \\
 \hline
 \textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Mô tả trong bối cảnh hệ thống TMC} & \textbf{Cơ sở xác định} & \textbf{Mức độ ưu tiên} \\
 \hline
@@ -24,15 +24,15 @@ Dựa trên bối cảnh nghiệp vụ, các yêu cầu chức năng, yêu cầu
 \hline
 \endlastfoot
 
-1 & Performance -- Hiệu năng & Đảm bảo quá trình xác thực QR, điều khiển cổng và phản hồi kết quả cho người dùng diễn ra nhanh chóng, đặc biệt trong giờ giao ca. & FR-14; NFR-AVL-02; R-01; mục 4.1 & Rất cao \\
+1 & Performance -- Hiệu năng & Đảm bảo quá trình xác thực QR, điều khiển cổng và phản hồi kết quả cho người dùng diễn ra nhanh chóng, đặc biệt trong giờ giao ca. & NFR-PER-01, NFR-PER-02; FR-14; R-01; mục~\ref{sec:business-flows} & Rất cao \\
 \hline
-2 & Availability -- Tính sẵn sàng & Duy trì hoạt động chấm công và kiểm soát ra vào khi xảy ra sự cố kết nối giữa trạm cổng và hệ thống trung tâm; hỗ trợ lưu trữ và đồng bộ dữ liệu khi kết nối được khôi phục. & FR-17; nhóm NFR-AVL; R-02 & Rất cao \\
+2 & Availability -- Tính sẵn sàng & Duy trì hoạt động chấm công và kiểm soát ra vào khi xảy ra sự cố kết nối giữa trạm cổng và hệ thống trung tâm; hỗ trợ lưu trữ và đồng bộ dữ liệu khi kết nối được khôi phục; theo dõi được trạng thái hoạt động và kết nối của các trạm cổng để phát hiện sự cố kịp thời. & FR-17 (trong ngưỡng mất kết nối); FR-09; nhóm NFR-AVL; R-02 & Rất cao \\
 \hline
 3 & Reliability -- Độ tin cậy & Đảm bảo các giao dịch chấm công đã xác nhận được bảo toàn, việc gửi lại yêu cầu không tạo ra giao dịch trùng lặp và các lỗi tích hợp được xử lý phù hợp. & NFR-REL-01 đến NFR-REL-04; FR-21, FR-22; R-03, R-05 & Rất cao \\
 \hline
 4 & Data Integrity -- Tính toàn vẹn dữ liệu & Đảm bảo dữ liệu chấm công chính xác, đầy đủ và không bị ghi nhận trùng lặp; các điều chỉnh phải bảo toàn bản ghi gốc và lịch sử thay đổi. & NFR-DIN-01 đến NFR-DIN-04; FR-15, FR-16 & Rất cao \\
 \hline
-5 & Security -- Bảo mật & Ngăn chặn truy cập trái phép, kiểm soát quyền truy cập theo vai trò và chỉ cho phép mở cổng khi thông tin xác thực đáp ứng các điều kiện hợp lệ. & NFR-SEC-01 đến NFR-SEC-04; FR-25 đến FR-27 & Rất cao \\
+5 & Security -- Bảo mật & Ngăn chặn truy cập trái phép, kiểm soát quyền truy cập theo vai trò và chỉ cho phép mở cổng khi thông tin xác thực đáp ứng các điều kiện hợp lệ; ngăn mã QR bị lộ hoặc bị phát lại được sử dụng để ra vào trái phép. & NFR-SEC-01 đến NFR-SEC-06; FR-25 đến FR-27; R-04, R-06 & Rất cao \\
 \hline
 6 & Interoperability -- Khả năng tương tác & Đảm bảo hệ thống trao đổi dữ liệu chính xác và nhất quán với hệ thống cổng xoay và hệ thống HR/Payroll thông qua các giao diện tích hợp được hỗ trợ. & NFR-INT-01 đến NFR-INT-04; C-01, C-02 & Cao \\
 \hline
@@ -42,20 +42,22 @@ Dựa trên bối cảnh nghiệp vụ, các yêu cầu chức năng, yêu cầu
 \hline
 9 & Recoverability -- Khả năng phục hồi & Đảm bảo dữ liệu chấm công có thể được khôi phục khi xảy ra sự cố, đồng thời duy trì các thông tin quan trọng cần thiết để xác định và đối chiếu giao dịch. & NFR-REC-01, NFR-REC-02 & Cao \\
 \hline
-10 & Scalability -- Khả năng mở rộng & Đảm bảo hệ thống có khả năng đáp ứng nhu cầu xử lý chấm công tại cả hai nhà máy và hỗ trợ sự gia tăng về số lượng nhân viên, trạm cổng và lưu lượng giao dịch. & Quy mô hệ thống tại mục 2.1; C-04; R-01 & Trung bình \\
+10 & Scalability -- Khả năng mở rộng & Đảm bảo hệ thống có khả năng đáp ứng nhu cầu xử lý chấm công tại cả hai nhà máy và hỗ trợ sự gia tăng về số lượng nhân viên, trạm cổng và lưu lượng giao dịch. & NFR-SCA-01; C-04; R-01 & Trung bình \\
+\hline
+11 & Modifiability -- Khả năng sửa đổi & Đảm bảo việc thay đổi nhà cung cấp cổng xoay hoặc thay đổi API của hệ thống HR/Payroll chỉ ảnh hưởng đến thành phần tích hợp tương ứng, không làm thay đổi nghiệp vụ lõi. & NFR-MOD-01; C-01; A-03 & Trung bình \\
 \end{longtable}
 \normalsize
 
-\noindent\textbf{Nhận xét:} Các đặc tính có mức ưu tiên rất cao gồm hiệu năng, tính sẵn sàng, độ tin cậy, tính toàn vẹn dữ liệu và bảo mật. Đây là những yếu tố ảnh hưởng trực tiếp đến hoạt động kiểm soát ra vào, độ chính xác của dữ liệu chấm công và tính liên tục của nghiệp vụ tại hai nhà máy. Các đặc tính còn lại hỗ trợ việc tích hợp hệ thống, truy vết hoạt động, bảo vệ dữ liệu cá nhân, phục hồi sau sự cố và đáp ứng nhu cầu vận hành khi quy mô hệ thống tăng lên.
+\noindent\textbf{Nhận xét:} Các đặc tính có mức ưu tiên rất cao gồm hiệu năng, tính sẵn sàng, độ tin cậy, tính toàn vẹn dữ liệu và bảo mật. Đây là những yếu tố ảnh hưởng trực tiếp đến hoạt động kiểm soát ra vào, độ chính xác của dữ liệu chấm công và tính liên tục của nghiệp vụ tại hai nhà máy. Các đặc tính còn lại hỗ trợ việc tích hợp hệ thống, truy vết hoạt động, bảo vệ dữ liệu cá nhân, phục hồi sau sự cố, đáp ứng nhu cầu vận hành khi quy mô hệ thống tăng lên và hạn chế chi phí khi các hệ thống bên ngoài thay đổi.
 
-\subsection{Lựa chọn đặc tính kiến trúc ưu tiên (Top 3 Driving Factors)}
+\subsection{Lựa chọn đặc tính kiến trúc ưu tiên (Top 3 Driving Factors)}\label{sec:top3}
 
 Dựa trên Architecture Characteristics Worksheet, ba đặc tính kiến trúc được lựa chọn làm yếu tố dẫn dắt chính cho hệ thống TMC là Performance, Reliability và Data Integrity. Việc lựa chọn này xuất phát từ yêu cầu xử lý nhanh các lượt quét QR, đảm bảo hoạt động chấm công đáng tin cậy và duy trì tính chính xác của dữ liệu phục vụ đối chiếu, tổng hợp và chuyển giao cho hệ thống HR/Payroll.
 
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{longtable}{|>{\centering\arraybackslash}p{0.7cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{5.8cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
-\caption{Các đặc tính kiến trúc dẫn dắt chính} \\
+\caption{Các đặc tính kiến trúc dẫn dắt chính}\label{tab:top3} \\
 \hline
 \textbf{STT} & \textbf{Đặc tính kiến trúc} & \textbf{Cơ sở lựa chọn} & \textbf{Ảnh hưởng đến quyết định kiến trúc} \\
 \hline
@@ -82,7 +84,7 @@ Các đặc tính còn lại vẫn là những yêu cầu quan trọng của h�
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{longtable}{|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{10.7cm}|}
-\caption{Lý do các đặc tính còn lại không thuộc Top 3 Driving Factors} \\
+\caption{Lý do các đặc tính còn lại không thuộc Top 3 Driving Factors}\label{tab:non-top3} \\
 \hline
 \textbf{Đặc tính kiến trúc} & \textbf{Lý do không thuộc Top 3 Driving Factors} \\
 \hline
@@ -108,6 +110,8 @@ Privacy -- Bảo vệ dữ liệu cá nhân & Việc bảo vệ dữ liệu cá 
 Recoverability -- Khả năng phục hồi & Khả năng khôi phục dữ liệu sau sự cố rất quan trọng, nhưng chủ yếu liên quan đến sao lưu và phục hồi khi xảy ra sự cố. Trong phạm vi lựa chọn Top 3, đặc tính này được xem xét cùng các cơ chế bảo toàn dữ liệu và xử lý lỗi của Reliability và Data Integrity. \\
 \hline
 Scalability -- Khả năng mở rộng & Hệ thống hiện được xác định triển khai tại hai nhà máy với quy mô nhân sự đã nêu trong báo cáo. Yêu cầu nổi bật hiện tại là xử lý tải chấm công trong giờ giao ca; do chưa có mục tiêu tăng trưởng định lượng cụ thể, khả năng mở rộng chưa được chọn làm yếu tố dẫn dắt chính. \\
+\hline
+Modifiability -- Khả năng sửa đổi & Việc cách ly các hệ thống bên ngoài giúp giảm chi phí thay đổi trong dài hạn, nhưng không quyết định luồng xử lý giao dịch cốt lõi. Yêu cầu này được đáp ứng thông qua nguyên tắc tổ chức thành phần tích hợp và được dùng làm tiêu chí phụ khi lựa chọn architecture style. \\
 \end{longtable}
 \normalsize
 
@@ -118,7 +122,7 @@ Các đặc tính kiến trúc có thể hỗ trợ hoặc xung đột với nha
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{longtable}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{5.8cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
-\caption{Đánh giá trade-off giữa các đặc tính kiến trúc} \\
+\caption{Đánh giá trade-off giữa các đặc tính kiến trúc}\label{tab:tradeoffs} \\
 \hline
 \textbf{Cặp đặc tính} & \textbf{Sự đánh đổi} & \textbf{Định hướng cân bằng} \\
 \hline
@@ -142,6 +146,8 @@ Reliability -- Data Integrity & Cơ chế thử lại khi xảy ra lỗi có th�
 Performance -- Security & Việc xác thực, kiểm tra quyền và kiểm tra trạng thái QR có thể làm tăng thời gian xử lý. & Tối ưu cơ chế xác thực và truy vấn trạng thái nhưng vẫn phải bảo đảm QR hợp lệ trước khi cho phép mở cổng. \\
 \hline
 Reliability -- Availability & Phụ thuộc hoàn toàn vào hệ thống trung tâm có thể khiến trạm cổng bị ảnh hưởng khi mạng gián đoạn; xử lý ngoại tuyến lại tạo thêm yêu cầu đồng bộ và kiểm soát tính nhất quán. & Xác định rõ phạm vi xử lý khi mất kết nối, chính sách lưu dữ liệu tạm thời và quy tắc đồng bộ sau khi hệ thống hoạt động trở lại. \\
+\hline
+Availability -- Security & Cho phép trạm cổng tiếp tục xác thực bằng dữ liệu cục bộ khi mất kết nối có thể khiến trạng thái thu hồi QR chưa được cập nhật kịp, dẫn đến nguy cơ chấp nhận mã không còn hợp lệ (R-04). & Giới hạn thời gian hoạt động ngoại tuyến bằng ngưỡng mất kết nối được cấu hình (FR-17); sử dụng mã QR động có thời hạn ngắn (NFR-SEC-05) để hạn chế thời gian một mã bị lộ hoặc đã thu hồi còn có thể được sử dụng. \\
 \end{longtable}
 \normalsize
 

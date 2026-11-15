@@ -1,246 +1,300 @@
 \section{Cấu trúc kiến trúc hệ thống}\label{sec:architecture-structure}
 
-\subsection{Phân tích architecture quantum}
-\subsubsection{Cơ sở phân tích}
-Architecture quantum là đơn vị triển khai độc lập, có độ kết dính chức năng cao, ghép nối tĩnh chặt (cùng mã nguồn, cùng kho dữ liệu) và ghép nối động đồng bộ bên trong. Hai phần thuộc cùng một quantum khi phải triển khai cùng nhau, dùng chung kho dữ liệu hoặc gọi nhau đồng bộ trên đường xử lý chính (ví dụ quét QR và mở cổng tại trạm). Hai phần tách thành hai quantum khi cần bộ đặc tính kiến trúc khác nhau và liên lạc được bất đồng bộ (ví dụ xử lý tại cổng và báo cáo ở trung tâm). Cơ sở phân tích là bảng subdomain (mục 3.3) và các đặc tính ưu tiên (mục 4.2).
+% Phần này xây dựng cấu trúc kiến trúc của hệ thống TMC qua ba nhiệm vụ nối tiếp nhau: (1) so sánh và lựa chọn architecture style phù hợp; (2) xây dựng kiến trúc logic và kiến trúc vật lý theo từng bước; (3) trình bày kiến trúc theo các góc nhìn module, component-and-connector và allocation. Đầu ra của mỗi nhiệm vụ là đầu vào của nhiệm vụ tiếp theo, như tóm tắt trong Bảng~\ref{tab:design-roadmap}.
 
-\subsubsection{So sánh đặc tính kiến trúc của thành phần xử lý tại trạm cổng và thành phần báo cáo}
-Đặc tính kiến trúc chủ đạo (driving architecture characteristics) là những đặc tính phi chức năng có ảnh hưởng lớn nhất đến cấu trúc của một thành phần: thành phần không đạt mục tiêu nếu thiếu chúng, và để đạt được chúng phải lựa chọn cấu trúc, vị trí triển khai và công nghệ tương ứng. Bảng dưới so sánh hai thành phần nằm ở hai thái cực của hệ thống theo các tiêu chí này.
+% Hai vấn đề phát sinh được nêu trong đề bài là \textbf{mất kết nối trong quá trình xử lý giao dịch chấm công} (R-02) và \textbf{mã QR tĩnh bị lộ} (R-06) được xem là các yếu tố dẫn dắt thiết kế ngay từ đầu, thay vì được xử lý riêng ở cuối. Tại mỗi bước, đoạn \textit{Liên hệ với vấn đề phát sinh} chỉ ra quyết định của bước đó góp phần giải quyết vấn đề nào và theo cách nào.
+
+% \begin{table}[H]
+% \centering
+% \caption{Lộ trình thiết kế cấu trúc kiến trúc}\label{tab:design-roadmap}
+% \small
+% \renewcommand{\arraystretch}{1.3}
+% \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|}
+% \hline
+% \textbf{Bước} & \textbf{Câu hỏi cần trả lời} & \textbf{Đầu vào} & \textbf{Đầu ra} & \textbf{Mục} \\
+% \hline
+% Lựa chọn architecture style & Hệ thống nên được chia thành bao nhiêu đơn vị triển khai và tổ chức theo kiểu kiến trúc nào? & Top-3 đặc tính, ràng buộc, subdomain, bất biến, vấn đề phát sinh & Architecture quantum, style được chọn & \ref{sec:style-selection} \\
+% \hline
+% Xây dựng kiến trúc logic & Hệ thống gồm những component nào, mỗi component chịu trách nhiệm gì và giao tiếp với nhau ra sao? & Subdomain, FR, style được chọn & Danh mục component, danh mục connector & \ref{sec:logical-architecture} \\
+% \hline
+% Xây dựng kiến trúc vật lý & Mỗi component được triển khai ở đâu, trên hạ tầng nào và kết nối qua mạng ra sao? & Danh mục component, NFR, A-04, A-05 & Node, ánh xạ component vào node, phân vùng mạng & \ref{sec:physical-architecture} \\
+% \hline
+% Trình bày các góc nhìn & Kiến trúc được nhìn nhận thế nào dưới góc độ mã nguồn, thời gian chạy và hạ tầng? & Kết quả của ba bước trên & Module views, C\&C views, allocation views & \ref{sec:views} \\
+% \hline
+% \end{tabularx}
+% \end{table}
+
+\subsection{So sánh và lựa chọn architecture style}\label{sec:style-selection}
+Việc lựa chọn architecture style được thực hiện qua sáu bước: xác định đầu vào; phân tích architecture quantum để biết hệ thống cần bao nhiêu đơn vị triển khai độc lập; chọn cách phân rã cấp cao; xác định tiêu chí đánh giá; đánh giá các style ứng viên; và kết luận.
+
+\subsubsection{Đầu vào cho việc lựa chọn}\label{sec:style-inputs}
+Bảng~\ref{tab:style-inputs} tổng hợp các yếu tố từ những phần trước có ảnh hưởng trực tiếp đến việc lựa chọn architecture style.
 
 \begin{table}[H]
 \centering
-\caption{So sánh đặc tính kiến trúc của thành phần xử lý tại trạm cổng và thành phần báo cáo}
+\caption{Các yếu tố đầu vào cho việc lựa chọn architecture style}\label{tab:style-inputs}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Nhóm yếu tố} & \textbf{Nội dung} & \textbf{Ảnh hưởng tới lựa chọn style} \\
+\hline
+Đặc tính dẫn dắt & Performance, Reliability, Data Integrity (Mục~\ref{sec:top3}) & Ưu tiên đường xử lý lượt quét ngắn, lưu bền vững dữ liệu trước khi xác nhận và giao dịch nhất quán \\
+\hline
+Đặc tính nền tảng & Security, Availability, Auditability, Privacy & Phải được áp dụng xuyên suốt; trạm cổng phải tiếp tục hoạt động khi mất kết nối với trung tâm (FR-17) \\
+\hline
+Ràng buộc & C-01 (tích hợp qua API với cổng xoay và HR/Payroll), C-02 (hạn 12:00 ngày 1), C-04 (hai nhà máy) & Cần cách ly hệ thống bên ngoài; xử lý theo lô có thời hạn; có nhiều điểm triển khai tại hiện trường \\
+\hline
+Giả định & A-04 (cổng xoay phản hồi $\le$ 500 ms), A-05 (trung tâm dữ liệu on-premise, kết nối VPN) & Ngân sách 2 giây đủ cho xử lý cục bộ; đường truyền WAN giữa nhà máy và trung tâm có thể gián đoạn \\
+\hline
+Miền nghiệp vụ & Bảy subdomain (Mục~\ref{sec:subdomains}) và các bất biến INV-01 -- INV-11 (Mục~\ref{sec:invariants}) & Định hình ranh giới module; INV-01, INV-08, INV-09 đòi hỏi giao dịch ACID tại nơi lưu dữ liệu tập trung \\
+\hline
+Đặc điểm tải & 800 lượt quét trong 30 phút mỗi nhà máy, tương đương trung bình 0,44 lượt/giây; đỉnh tức thời giả định 2--5 lượt/giây mỗi nhà máy; khoảng 2.800 lượt quét mỗi ngày cho 1.400 nhân viên; vài chục người dùng web đồng thời & Tải thấp: không cần phân tán quy mô lớn, nhưng tải dồn vào giờ giao ca nên đường xử lý lượt quét phải ngắn \\
+\hline
+Nguồn lực & Nhóm phát triển 8 sinh viên, thời gian một học kỳ, ưu tiên chi phí vận hành thấp & Ưu tiên style ít đơn vị triển khai, không đòi hỏi hạ tầng phức tạp \\
+\hline
+Vấn đề phát sinh & Mất kết nối trong quá trình xử lý giao dịch (R-02); mã QR tĩnh bị lộ (R-06) & Trạm cổng phải tự xử lý và lưu bền vững tại chỗ; việc xác thực mã QR phải thực hiện được tại cổng mà không cần hỏi trung tâm \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Phân tích architecture quantum}\label{sec:quantum}
+Architecture quantum là đơn vị triển khai độc lập, có độ kết dính chức năng cao, ghép nối tĩnh chặt (cùng mã nguồn, cùng kho dữ liệu) và ghép nối động đồng bộ bên trong. Hai phần thuộc cùng một quantum khi phải triển khai cùng nhau, dùng chung kho dữ liệu hoặc gọi nhau đồng bộ trên đường xử lý chính. Hai phần nên tách thành hai quantum khi cần bộ đặc tính kiến trúc khác nhau và có thể liên lạc bất đồng bộ. Số quantum quyết định trực tiếp style phù hợp: một quantum cho phép dùng các style nguyên khối, còn nhiều quantum đòi hỏi style phân tán.
+
+\paragraph{So sánh hai thái cực của hệ thống.} Bảng~\ref{tab:quantum-compare} so sánh thành phần xử lý tại trạm cổng và thành phần báo cáo -- hai thành phần nằm ở hai đầu của hệ thống về đặc tính kiến trúc.
+
+\begin{table}[H]
+\centering
+\caption{So sánh đặc tính kiến trúc của thành phần xử lý tại trạm cổng và thành phần báo cáo}\label{tab:quantum-compare}
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Tiêu chí so sánh} & \textbf{Xử lý tại trạm cổng (subdomain Kiểm soát ra vào)} & \textbf{Báo cáo và giám sát (subdomain Báo cáo)} \\
+\textbf{Tiêu chí so sánh} & \textbf{Xử lý tại trạm cổng} & \textbf{Báo cáo và giám sát} \\
 \hline
-Đặc tính kiến trúc chủ đạo & Performance, Reliability và Availability (kèm khả năng vận hành khi mất kết nối) & Security và tính chính xác của dữ liệu tổng hợp \\
+Đặc tính kiến trúc chủ đạo & Performance, Reliability, Data Integrity; Availability khi mất kết nối & Security (phạm vi dữ liệu), tính chính xác của dữ liệu tổng hợp \\
 \hline
-Yêu cầu về thời gian đáp ứng & Kết quả xử lý mỗi lần quét phải được trả về trong thời gian không quá 2 giây (NFR-01) & Chấp nhận độ trễ từ vài giây đến vài phút \\
+Yêu cầu về thời gian đáp ứng & Kết quả mỗi lượt quét phải hiển thị trong $\le$ 2 giây (NFR-PER-01) & Chấp nhận độ trễ từ vài giây đến vài phút \\
 \hline
-Yêu cầu khi mất kết nối với trung tâm & Phải duy trì hoạt động độc lập, không làm gián đoạn việc ra vào (NFR-07) & Có thể tạm ngừng phục vụ mà không ảnh hưởng đến việc ra vào \\
+Yêu cầu khi mất kết nối với trung tâm & Phải tiếp tục hoạt động trong ngưỡng mất kết nối, không làm gián đoạn việc ra vào (FR-17, NFR-AVL-04) & Có thể tạm ngừng phục vụ mà không ảnh hưởng đến việc ra vào \\
 \hline
-Yêu cầu về toàn vẹn dữ liệu & Mỗi giao dịch phải được lưu bền vững trước khi xác nhận kết quả cho người dùng (NFR-02) & Dữ liệu chỉ đọc, được dẫn xuất từ các giao dịch đã ghi nhận \\
+Yêu cầu về toàn vẹn dữ liệu & Dữ liệu lượt quét phải được lưu bền vững trước khi báo thành công (NFR-REL-03, INV-05); không tạo bản ghi trùng (INV-06) & Dữ liệu chỉ đọc, dẫn xuất từ các giao dịch đã ghi nhận \\
 \hline
-Đặc trưng truy cập dữ liệu & Ghi nhiều, chỉ thêm mới; đọc từ bản sao dữ liệu lưu cục bộ & Chỉ đọc; truy vấn tổng hợp theo tháng \\
+Đặc trưng truy cập dữ liệu & Ghi nhiều, chỉ thêm mới; đọc từ bản sao cục bộ & Chỉ đọc; truy vấn tổng hợp theo tháng \\
 \hline
-Đặc điểm tải & Biến động mạnh, tập trung tại thời điểm đổi ca (ước tính 2 đến 5 giao dịch/giây mỗi nhà máy) & Tăng quanh kỳ chốt; số người dùng đồng thời thấp \\
+Đặc điểm tải & Dồn vào giờ giao ca, đỉnh 2--5 lượt/giây mỗi nhà máy & Tăng quanh kỳ chốt; ít người dùng đồng thời \\
 \hline
-Hệ quả khi xảy ra sự cố & Tắc nghẽn luồng người tại điểm kiểm soát; nguy cơ mất giao dịch & Chậm trễ trong việc khai thác báo cáo \\
+Hệ quả khi xảy ra sự cố & Ùn tắc tại cổng; nguy cơ mất giao dịch chấm công & Chậm trễ trong khai thác báo cáo \\
 \hline
-Vị trí triển khai phù hợp & Tại từng nhà máy, gần cổng xoay & Tại trung tâm \\
-\hline
-\end{tabularx}
-\end{table}
-
-Hai thành phần chênh lệch ở cả đặc tính kiến trúc chủ đạo lẫn hệ quả khi xảy ra sự cố, nên không thể gộp vào cùng một quantum mà vẫn đáp ứng đồng thời NFR-01, NFR-02 và NFR-07.
-
-\subsubsection{Bảng Subdomain, đặc tính cần và quantum}
-Hệ thống gồm hai quantum: Q1 Gate Quantum đặt tại mỗi nhà máy và Q2 Central Quantum đặt tại trung tâm. Một số subdomain bị tách đôi vì hai nửa của chúng có đặc tính khác nhau.
-
-\begin{table}[H]
-\centering
-\caption{Subdomain, đặc tính cần và quantum}
-\small
-\renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\centering\arraybackslash}p{1.6cm}|>{\raggedright\arraybackslash}X|}
-\hline
-\textbf{Subdomain (mục 3)} & \textbf{Đặc tính cần (theo thứ tự)} & \textbf{Quantum} & \textbf{Ghi chú} \\
-\hline
-Kiểm soát ra vào: xác thực QR, mở cổng, ghi giao dịch (phía trạm cổng) & Performance, Reliability, Availability/Offline, Security & Q1 & Dùng bản sao cục bộ của danh sách QR hợp lệ và cấu hình trạm; lưu bền vững trước khi báo thành công \\
-\hline
-Tích hợp: adapter cổng xoay & Performance, Availability & Q1 & Gọi đồng bộ trong ngân sách 2 giây; có timeout và circuit breaker \\
-\hline
-Kiểm soát ra vào: nhận và lưu giao dịch (phía trung tâm) & Reliability/Data Integrity, Auditability & Q2 & Idempotent theo eventId \\
-\hline
-Điều chỉnh chấm công và chốt kỳ & Reliability/Data Integrity, Auditability, đúng hạn 12:00 ngày 1 & Q2 & Xử lý theo lô, chạy nền \\
-\hline
-Tích hợp: adapter HR/Payroll & Reliability (gửi lại khi lỗi), Interoperability & Q2 & Cách ly API bên ngoài khỏi nghiệp vụ lõi \\
-\hline
-Quản lý nhân viên và mã QR & Security, Privacy, Data Integrity & Q2 (nguồn dữ liệu), bản sao xuống Q1 & Độ trễ lan truyền thu hồi QR $\le$ 60 giây (đề xuất) \\
-\hline
-Quản lý trạm cổng & Availability (giám sát), Observability & Q2, bản sao cấu hình xuống Q1 & Heartbeat đi từ Q1 lên Q2 \\
-\hline
-Báo cáo và giám sát & Security (phạm vi dữ liệu), hiệu năng truy vấn mức vừa phải & Q2 & Module riêng, chỉ đọc \\
-\hline
-Xác thực, phân quyền và audit & Security, Auditability & Q2 & Thao tác mở cổng thủ công tại trạm cổng được ghi cục bộ rồi đồng bộ, để audit không bị mất \\
+Vị trí triển khai phù hợp & Tại từng nhà máy, gần cổng xoay & Tại trung tâm dữ liệu \\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsubsection{Tính độc lập về triển khai, mở rộng và chịu lỗi}
+Hai thành phần khác nhau cả về đặc tính chủ đạo lẫn hệ quả khi xảy ra sự cố. Nếu gộp chúng vào cùng một quantum đặt tại trung tâm, mỗi lượt quét phải đi qua đường truyền WAN nên không thể bảo đảm đồng thời NFR-PER-01 và FR-17. Ngược lại, nếu đặt toàn bộ hệ thống tại từng nhà máy, dữ liệu bị phân mảnh và không thể tổng hợp tập trung để truyền sang HR/Payroll đúng hạn (C-02). Do đó hệ thống cần ít nhất hai quantum.
+
+\paragraph{Phân bổ subdomain vào quantum.} Bảng~\ref{tab:subdomain-quantum} phân bổ bảy subdomain ở Mục~\ref{sec:subdomains} vào quantum dựa trên đặc tính mà từng subdomain cần. Hai subdomain bị tách đôi vì hai nửa của chúng có đặc tính khác nhau: \textit{Kiểm soát ra vào} (phía trạm cổng và phía trung tâm) và \textit{Tích hợp} (cổng xoay và HR/Payroll).
 
 \begin{table}[H]
 \centering
-\caption{Tính độc lập về triển khai, mở rộng và chịu lỗi}
+\caption{Phân bổ subdomain vào architecture quantum}\label{tab:subdomain-quantum}
 \small
 \renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.7cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\centering\arraybackslash}p{1.6cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Subdomain} & \textbf{Đặc tính cần} & \textbf{Quantum} & \textbf{Ghi chú} \\
+\hline
+Kiểm soát ra vào -- phía trạm cổng (xác thực QR, mở cổng, ghi lượt quét và giao dịch) & Performance, Reliability, Data Integrity, Availability, Security & Q1 & Chỉ dùng dữ liệu cục bộ: bản sao danh sách credential, khóa công khai để kiểm tra chữ ký mã QR, cấu hình trạm; lưu bền vững trước khi báo thành công (INV-05) \\
+\hline
+Kiểm soát ra vào -- phía trung tâm (tiếp nhận và lưu trữ tập trung) & Reliability, Data Integrity, Auditability & Q2 & Tiếp nhận idempotent theo mã sự kiện (INV-06) \\
+\hline
+Tích hợp -- cổng xoay & Performance, Availability & Q1 & Gọi đồng bộ trong ngân sách 2 giây, có giới hạn thời gian chờ \\
+\hline
+Tích hợp -- HR/Payroll & Reliability, Interoperability & Q2 & Hai chiều: nhận dữ liệu nhân viên, gửi dữ liệu chấm công theo lô và gửi lại khi lỗi \\
+\hline
+Quản lý nhân viên và mã QR & Security, Privacy, Data Integrity & Q2 (nguồn), bản sao xuống Q1 & Ký mã QR động; thu hồi có hiệu lực tại trạm $\le$ 60 giây (NFR-SEC-06, INV-02) \\
+\hline
+Quản lý trạm cổng & Availability (giám sát trạm) & Q2, bản sao cấu hình xuống Q1 & Trạng thái trạm được cập nhật qua heartbeat từ Q1 lên Q2 \\
+\hline
+Điều chỉnh chấm công và chốt kỳ & Reliability, Data Integrity, Auditability & Q2 & Xử lý theo lô, chạy nền; phải hoàn tất trước 12:00 ngày 1 (C-02) \\
+\hline
+Báo cáo và giám sát & Security, Privacy & Q2 & Chỉ đọc; lọc dữ liệu theo phạm vi người xem (INV-11) \\
+\hline
+Xác thực, phân quyền và audit & Security, Auditability & Q2 & Thao tác mở cổng thủ công tại trạm được ghi cục bộ rồi đồng bộ lên để audit không bị mất \\
+\hline
+\end{tabularx}
+\end{table}
+
+\paragraph{Kết quả: hai loại quantum.} Hệ thống gồm hai loại quantum với ba thể hiện triển khai (Hình~\ref{fig:quantum-overview}): \textbf{Q1 Gate Quantum} đặt tại mỗi nhà máy (Bình Dương và Long An) và \textbf{Q2 Central Quantum} đặt tại trung tâm dữ liệu. Báo cáo và chốt kỳ có đặc tính khác với phần còn lại của Q2 nhưng dùng chung kho dữ liệu trung tâm và có tải thấp, nên không tách thành quantum riêng; ranh giới giữa chúng được giữ ở mức module.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/06_architecture_structure/quantum_overview.png}
+\caption{Tổng quan các architecture quantum của hệ thống TMC}
+\label{fig:quantum-overview}
+\end{figure}
+
+Bảng~\ref{tab:quantum-independence} cho thấy hai quantum độc lập với nhau về triển khai, mở rộng và chịu lỗi.
+
+\begin{table}[H]
+\centering
+\caption{Tính độc lập về triển khai, mở rộng và chịu lỗi của hai quantum}\label{tab:quantum-independence}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 \hline
 \textbf{Quantum} & \textbf{Triển khai} & \textbf{Mở rộng} & \textbf{Chịu lỗi} \\
 \hline
-Q1 Gate Quantum & Cập nhật theo từng nhà máy, không ảnh hưởng nhà máy còn lại & Theo số trạm cổng của nhà máy; thêm trạm chỉ là thêm cấu hình (NFR-08) & Trung tâm hỏng hoặc mất mạng thì cổng vẫn chạy; lỗi ở nhà máy này không lan sang nhà máy kia \\
+Q1 Gate Quantum & Cập nhật theo từng nhà máy, không ảnh hưởng nhà máy còn lại & Thêm trạm cổng chỉ cần khai báo cấu hình; thêm nhà máy chỉ cần triển khai thêm một thể hiện Q1 (NFR-SCA-01) & Trung tâm gặp sự cố hoặc mất kết nối thì cổng vẫn hoạt động trong ngưỡng cấu hình; lỗi ở nhà máy này không lan sang nhà máy kia \\
 \hline
-Q2 Central Quantum & Theo kế hoạch bảo trì, không cần dừng cổng & Mở rộng dọc là đủ vì tải thấp (vài chục người dùng, vài giao dịch/giây) & Q2 hỏng thì báo cáo, điều chỉnh và đồng bộ tạm ngừng; giao dịch tích lại trong outbox tại Q1 và được gửi bù khi Q2 hoạt động lại \\
+Q2 Central Quantum & Theo kế hoạch bảo trì, không cần dừng cổng & Mở rộng theo chiều dọc là đủ vì tải thấp & Q2 gặp sự cố thì báo cáo, điều chỉnh và đồng bộ tạm ngừng; dữ liệu tích lại trong outbox tại Q1 và được gửi bù khi Q2 hoạt động trở lại \\
 \hline
 \end{tabularx}
 \end{table}
 
-Hai quantum ghép nối với nhau như sau:
+Hai quantum ghép nối với nhau theo ba nguyên tắc:
+\begin{itemize}
+    \item \textbf{Chiều xuống (Q2 $\rightarrow$ Q1):} danh sách credential đang hiệu lực, khóa công khai dùng để kiểm tra chữ ký mã QR và cấu hình trạm được nhân bản bất đồng bộ, nhất quán cuối cùng với độ trễ $\le$ 60 giây khi có kết nối (NFR-SEC-06).
+    \item \textbf{Chiều lên (Q1 $\rightarrow$ Q2):} giao dịch chấm công, lượt quét, nhật ký mở cổng thủ công và heartbeat được gửi qua transactional outbox, bảo đảm chuyển giao ít nhất một lần và idempotent theo mã sự kiện (INV-06).
+    \item \textbf{Không có lời gọi đồng bộ từ Q1 lên Q2 trên đường xử lý lượt quét.} Lời gọi đồng bộ duy nhất trên đường này là từ Q1 tới hệ thống cổng xoay trong cùng mạng nhà máy. Q2 gọi HR/Payroll theo lô và bất đồng bộ.
+\end{itemize}
 
-Chiều xuống (Q2 sang Q1): danh sách QR hợp lệ và cấu hình trạm được nhân bản bất đồng bộ, nhất quán cuối cùng với độ trễ $\le$ 60 giây.
+\paragraph{Yêu cầu đặt ra cho architecture style.} Từ phân tích quantum, style được chọn phải: (Y1) hỗ trợ ít nhất hai đơn vị triển khai độc lập, trong đó Q1 có nhiều thể hiện; (Y2) cho phép liên lạc bất đồng bộ, chịu được gián đoạn và không tạo dữ liệu trùng; (Y3) cho phép Q1 tự xử lý và lưu bền vững tại chỗ khi mất kết nối; (Y4) giữ được giao dịch ACID tại Q2 cho các bất biến INV-01, INV-08, INV-09; (Y5) cách ly các hệ thống bên ngoài; (Y6) có chi phí vận hành phù hợp với nhóm nhỏ.
 
-Chiều lên (Q1 sang Q2): giao dịch, lần quét bị từ chối, heartbeat và nhật ký mở cổng thủ công đi qua transactional outbox, chuyển giao ít nhất một lần và idempotent theo eventId.
+\paragraph{Liên hệ với vấn đề phát sinh.} Việc tách Q1 khỏi Q2 là quyết định gốc để giải quyết vấn đề \textit{mất kết nối}: mọi bước cần thiết để cho một nhân viên qua cổng đều nằm trong Q1, nên đường truyền WAN bị gián đoạn chỉ làm chậm việc đồng bộ chứ không làm gián đoạn việc ra vào hay làm mất giao dịch. Đối với vấn đề \textit{mã QR tĩnh}, yêu cầu Q1 không gọi đồng bộ lên trung tâm dẫn đến việc mã QR phải tự chứng minh được tính hợp lệ của nó tại cổng: mã QR là mã động có thời hạn ngắn, được ký số tại Q2 và được kiểm tra tại Q1 bằng khóa công khai đã nhân bản xuống, không cần tra cứu trực tuyến.
 
-Không có lời gọi đồng bộ từ Q1 lên Q2 trên đường xử lý lần quét. Đây là lý do đây là hai quantum riêng chứ không dính thành một.
-
-Lời gọi đồng bộ còn lại (Q1 gọi cổng xoay) là lời gọi tới hệ thống ngoài tại cùng nhà máy; Q2 gọi HR/Payroll theo lô, bất đồng bộ.
+\subsubsection{Phân rã cấp cao: theo kỹ thuật hay theo domain}\label{sec:partitioning}
+Trước khi so sánh các style cụ thể, cần quyết định cách phân rã ở cấp cao nhất: theo tầng kỹ thuật (giao diện, nghiệp vụ, dữ liệu) hay theo domain (mỗi phần ứng với một subdomain). Bảng~\ref{tab:partitioning} so sánh hai cách trong bối cảnh TMC.
 
 \begin{table}[H]
 \centering
-\caption{So sánh phân rã theo kỹ thuật và phân rã theo domain}
+\caption{So sánh phân rã theo kỹ thuật và phân rã theo domain}\label{tab:partitioning}
 \small
 \renewcommand{\arraystretch}{1.3}
 \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.8cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 \hline
 \diagbox[width=3.6cm]{\textbf{Tiêu chí}}{\textbf{Cách phân rã}} & \textbf{Phân rã theo kỹ thuật (technical partitioning)} & \textbf{Phân rã theo domain (domain partitioning)} \\
 \hline
-Nơi một thay đổi nghiệp vụ tác động (ví dụ thêm quy tắc anti-passback, thêm loại thiết bị xác thực) & Chạm nhiều tầng: giao diện, nghiệp vụ, dữ liệu & Gói trong một module của subdomain tương ứng \\
+Nơi một thay đổi nghiệp vụ tác động (ví dụ thêm quy tắc chống quẹt lặp chiều, thêm loại thiết bị xác thực) & Chạm nhiều tầng: giao diện, nghiệp vụ, dữ liệu & Gói trong một module của subdomain tương ứng \\
 \hline
-Phù hợp ranh giới nhất quán (mục 3.4) & Aggregate bị cắt ngang qua các tầng & Mỗi aggregate nằm trọn trong một module \\
+Phù hợp với bất biến nghiệp vụ (Mục~\ref{sec:invariants}) & Một bất biến bị cắt ngang qua các tầng & Mỗi bất biến được bảo vệ trọn trong một module \\
 \hline
-Phù hợp quantum & Khó tách riêng phần chạy tại cổng & Tách tự nhiên theo vị trí triển khai \\
+Phù hợp với quantum & Khó tách riêng phần chạy tại cổng & Tách tự nhiên theo vị trí triển khai \\
 \hline
-Làm việc song song trong nhóm & Dễ xung đột vì mọi tính năng đều đụng các tầng chung & Mỗi người phụ trách một module \\
+Làm việc song song trong nhóm & Dễ xung đột vì mọi tính năng đều đụng các tầng chung & Mỗi thành viên phụ trách một module \\
 \hline
 \end{tabularx}
 \end{table}
 
-Kết luận: phân rã theo domain ở cấp cao nhất; mỗi module tương ứng một subdomain hoặc một nhóm subdomain nhỏ. Bên trong mỗi module dùng phân tầng hoặc ports and adapters để cách ly API bên ngoài (NFR-09).
+Kết luận: hệ thống \textbf{phân rã theo domain ở cấp cao nhất}; mỗi module tương ứng với một subdomain hoặc một phần subdomain. Bên trong mỗi module dùng phân tầng theo kiểu ports and adapters để cách ly API bên ngoài (NFR-MOD-01). Kết luận này khiến các style phân rã theo kỹ thuật như layered bị đánh giá thấp ở các tiêu chí liên quan đến quantum và khả năng sửa đổi.
 
-\subsubsection{Kết luận về quantum}
-Số quantum: hai loại, ba thể hiện triển khai (Gate Quantum tại Bình Dương và Long An, Central Quantum tại trung tâm).
-
-Không tách thêm: báo cáo và chốt kỳ có đặc tính khác nhưng dùng chung kho dữ liệu trung tâm, tải thấp; chỉ giữ ranh giới module và quyền chỉ đọc.
-
-Style phải hỗ trợ hai đơn vị triển khai độc lập, liên lạc bất đồng bộ, và đơn vị tại cổng chạy được khi mất kết nối.
-
-\subsection{So sánh và lựa chọn architecture style}
-\subsubsection*{Các Architecture Style được xem xét}
-Sáu style ứng viên: layered, modular monolith, microkernel, service-based, event-driven và microservices. Mỗi style được đánh giá cho toàn hệ thống trong bối cảnh hai quantum ở mục 6.1.
-
-\subsubsection*{Tiêu chí và trọng số}
-Tiêu chí gồm ba đặc tính ưu tiên (mục 5.2), tiêu chí từ phân tích quantum (mục 6.1), ràng buộc dự án và một đặc tính thứ cấp. Trọng số từ 1 đến 3; thang điểm từ 1 đến 5 (5 là đáp ứng tốt nhất).
+\subsubsection{Tiêu chí đánh giá}\label{sec:style-criteria}
+Tiêu chí đánh giá được xây dựng từ ba đặc tính dẫn dắt ở Mục~\ref{sec:top3}, yêu cầu rút ra từ phân tích quantum, đặc tính nền tảng và ràng buộc dự án. Trọng số từ 1 đến 3 phản ánh mức độ quan trọng của tiêu chí; điểm từ 1 đến 5 phản ánh mức độ style đáp ứng tiêu chí, trong đó 1 là cản trở việc đáp ứng, 3 là đáp ứng được nếu bổ sung cơ chế và 5 là hỗ trợ một cách tự nhiên. Điểm tổng bằng tổng các tích điểm nhân trọng số, tối đa 95.
 
 \begin{table}[H]
 \centering
-\caption{Tiêu chí và trọng số}
+\caption{Tiêu chí đánh giá architecture style và trọng số}\label{tab:style-criteria}
 \small
 \renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{1cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{4cm}|>{\centering\arraybackslash}p{1.8cm}|}
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{0.8cm}|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{2.8cm}|>{\centering\arraybackslash}p{1.4cm}|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Mã} & \textbf{Tiêu chí} & \textbf{Nguồn} & \textbf{Trọng số} \\
+\textbf{Mã} & \textbf{Tiêu chí} & \textbf{Nguồn} & \textbf{Trọng số} & \textbf{Lý do trọng số} \\
 \hline
-C1 & Reliability / Data Integrity & Đặc tính ưu tiên 1 & 3 \\
+K1 & Reliability & Top-3 & 3 & Đặc tính dẫn dắt: không mất giao dịch khi có lỗi (NFR-REL-03) \\
 \hline
-C2 & Performance & Đặc tính ưu tiên 2 & 3 \\
+K2 & Performance & Top-3 & 3 & Đặc tính dẫn dắt: kiosk phản hồi $\le$ 2 giây (NFR-PER-01) \\
 \hline
-C3 & Security & Đặc tính ưu tiên 3 & 3 \\
+K3 & Data Integrity & Top-3 & 3 & Đặc tính dẫn dắt: không trùng, không sai lệch dữ liệu chấm công (NFR-DIN-02) \\
 \hline
-C4 & Hỗ trợ hai quantum: Gate Quantum chạy độc lập và offline & Mục 6.1 & 3 \\
+K4 & Hỗ trợ hai quantum và hoạt động khi mất kết nối & Mục~\ref{sec:quantum}; R-02; FR-17 & 3 & Yêu cầu bắt buộc Y1--Y3; trực tiếp giải quyết vấn đề mất kết nối của đề bài \\
 \hline
-C5 & Chi phí và độ phức tạp vận hành & Ràng buộc & 2 \\
+K5 & Security & Đặc tính nền tảng; R-06 & 2 & Bắt buộc nhưng áp dụng xuyên suốt, ít tạo khác biệt giữa các style \\
 \hline
-C6 & Năng lực nhóm và thời gian thực hiện & Ràng buộc & 2 \\
+K6 & Chi phí và độ phức tạp vận hành & Ràng buộc nguồn lực & 2 & Tải thấp nên chi phí vận hành phải tương xứng (Y6) \\
 \hline
-C7 & Modifiability / Interoperability (thêm thiết bị, thay đổi API ngoài) & Đặc tính thứ cấp, NFR-08, NFR-09 & 1 \\
+K7 & Năng lực nhóm và thời gian thực hiện & Ràng buộc nguồn lực & 2 & Nhóm sinh viên, thời gian một học kỳ \\
+\hline
+K8 & Modifiability / Interoperability & NFR-MOD-01; C-01 & 1 & Đặc tính có mức ưu tiên trung bình trong Bảng~\ref{tab:ac-worksheet} \\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsubsection*{Bảng chấm điểm}
-Điểm tổng bằng tổng của điểm từng tiêu chí nhân với trọng số, tối đa 85.
+\subsubsection{Đánh giá các style ứng viên}\label{sec:style-evaluation}
+Sáu style ứng viên được đánh giá cho toàn hệ thống trong bối cảnh hai quantum: layered, modular monolith, microkernel, service-based, event-driven và microservices. Phần dưới đây giải thích cơ sở cho điểm số của từng style; kết quả được tổng hợp ở Bảng~\ref{tab:style-scores}.
+
+\paragraph{Layered.} Hệ thống được chia theo tầng kỹ thuật và triển khai thành một khối tại trung tâm. Mỗi lượt quét phải đi qua WAN để tới tầng nghiệp vụ ở trung tâm, nên khi mất kết nối thì cổng ngừng hoạt động (K4 = 1) và thời gian phản hồi phụ thuộc vào chất lượng đường truyền (K2 = 3). Trung tâm trở thành điểm lỗi duy nhất và không có lưu trữ tại chỗ, nên giao dịch có thể bị mất khi đường truyền gián đoạn giữa chừng (K1 = 2). Một cơ sở dữ liệu duy nhất cho phép giao dịch ACID (K3 = 3) và việc tập trung xác thực, phân quyền khá đơn giản (K5 = 3). Đây là style quen thuộc và rẻ nhất (K6 = K7 = 5), nhưng mỗi thay đổi nghiệp vụ chạm nhiều tầng (K8 = 2).
+
+\paragraph{Modular monolith.} Hệ thống được chia module theo domain nhưng vẫn là một đơn vị triển khai. Ranh giới domain và giao dịch ACID trong một cơ sở dữ liệu giúp bảo vệ tốt các bất biến như INV-01, INV-09 (K3 = 4) và tập trung kiểm soát truy cập, audit (K5 = 4). Tuy nhiên, chỉ có một đơn vị triển khai nên phần xử lý tại cổng không thể chạy độc lập khi mất kết nối (K4 = 1), kéo theo hạn chế về độ tin cậy và hiệu năng tương tự layered (K1 = K2 = 3). Chi phí và độ phức tạp thấp (K6 = K7 = 5); ranh giới module giúp thay đổi được khoanh vùng (K8 = 4).
+
+\paragraph{Microkernel.} Lõi nhỏ cùng các plugin phù hợp với việc thay đổi nhà cung cấp cổng xoay hoặc loại thiết bị xác thực (K8 = 5), và lõi nhỏ cho đường xử lý nhanh (K2 = 4). Tuy nhiên, các nghiệp vụ như chốt kỳ, báo cáo và tích hợp HR/Payroll không mang tính plugin; nếu áp dụng cho toàn hệ thống thì vẫn là một đơn vị triển khai (K4 = 2). Khung plugin tốn công xây dựng với nhóm nhỏ (K7 = 2) và mỗi plugin là một bề mặt tấn công cần kiểm soát (K5 = 3). Độ tin cậy và toàn vẹn dữ liệu ở mức trung bình (K1 = K3 = 3), chi phí vận hành vừa phải (K6 = 4).
+
+\paragraph{Service-based.} Hệ thống gồm một số dịch vụ thô, mỗi dịch vụ ứng với một domain, thường dùng chung cơ sở dữ liệu. Phần xử lý tại cổng có thể là một dịch vụ riêng triển khai tại nhà máy, đáp ứng phần lớn yêu cầu về quantum (K4 = 4) và cho đường xử lý lượt quét ngắn (K2 = 4). Các dịch vụ trung tâm dùng chung cơ sở dữ liệu nên vẫn giữ được ACID (K3 = 4); lỗi của một dịch vụ không làm dừng các dịch vụ khác (K1 = 4). Ranh giới dịch vụ rõ ràng (K5 = K8 = 4). Đổi lại, việc tách trung tâm thành 4--6 tiến trình gọi nhau qua mạng làm tăng chi phí vận hành trong khi tải thấp (K6 = K7 = 3).
+
+\paragraph{Event-driven.} Các thành phần giao tiếp bất đồng bộ qua message broker. Style này phù hợp với việc chuyển dữ liệu từ cổng lên trung tâm và từ trung tâm sang HR/Payroll: broker đệm dữ liệu khi bên nhận gặp sự cố và hỗ trợ gửi lại (K1 = K4 = 4, K2 = 4). Tuy nhiên, phải xử lý thứ tự và trùng lặp thông điệp, dữ liệu chỉ nhất quán cuối cùng giữa các thành phần (K3 = 3). Việc vận hành một cụm broker cho tải trung bình 0,44 lượt/giây là quá mức cần thiết (K6 = K7 = 2) và broker là thêm một thành phần cần bảo mật (K5 = 3). Các thành phần tách rời qua sự kiện nên dễ mở rộng chức năng (K8 = 4).
+
+\paragraph{Microservices.} Mỗi chức năng là một dịch vụ độc lập với dữ liệu riêng, cho mức độc lập triển khai cao nhất (K4 = 5) và dễ thay đổi từng phần (K8 = 5). Tuy nhiên, dữ liệu phân tán khiến các bất biến như INV-09 (khóa kỳ và đợt truyền bổ sung) phải dùng saga, khó bảo đảm toàn vẹn (K3 = 2). Mỗi thao tác phải qua nhiều lời gọi mạng (K1 = K2 = 3) và bề mặt bảo mật lớn (K5 = 3). Chi phí vận hành và năng lực cần có vượt xa nguồn lực của nhóm và quy mô tải (K6 = K7 = 1).
+
+\paragraph{Phương án kết hợp.} Không style đơn lẻ nào đáp ứng tốt đồng thời K4 và K6--K7: các style một đơn vị triển khai không chạy được khi mất kết nối, còn các style phân tán lại tốn kém. Từ phân tích trên, nhóm xây dựng một phương án kết hợp, lấy ưu điểm của từng style cho đúng vị trí của nó: \textbf{khung service-based rút gọn còn hai dịch vụ thô} tương ứng với hai quantum; \textbf{modular monolith} bên trong Central Quantum để giữ ACID và ranh giới domain; \textbf{microkernel kết hợp ports and adapters} bên trong Gate Agent để cách ly thiết bị và cổng xoay; và \textbf{transactional outbox} (lấy từ event-driven) để chuyển dữ liệu tin cậy giữa hai quantum mà không cần broker. Phương án này đạt điểm cao nhất ở ba đặc tính dẫn dắt và K4 (K1 = K2 = K4 = 5). Data Integrity đạt 4 vì dữ liệu giữa hai quantum chỉ nhất quán cuối cùng, được bù lại bằng tính idempotent và ACID tại trung tâm. Security đạt 4 vì kiểm soát truy cập và audit tập trung tại trung tâm, nhưng thiết bị tại nhà máy cần được gia cố thêm. Chi phí và năng lực đạt 4 vì chỉ có hai loại đơn vị triển khai và không có broker, nhưng vẫn phải vận hành các node tại nhà máy.
 
 \begin{table}[H]
 \centering
-\caption{Chấm điểm}
+\caption{Chấm điểm các architecture style}\label{tab:style-scores}
 \small
 \renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|*{7}{>{\centering\arraybackslash}p{0.75cm}|}>{\centering\arraybackslash}p{1.1cm}|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|*{8}{>{\centering\arraybackslash}p{0.7cm}|}>{\centering\arraybackslash}p{1.1cm}|}
 \hline
-\textbf{Style} & \textbf{C1} & \textbf{C2} & \textbf{C3} & \textbf{C4} & \textbf{C5} & \textbf{C6} & \textbf{C7} & \textbf{Tổng} \\
+\textbf{Style} & \textbf{K1} & \textbf{K2} & \textbf{K3} & \textbf{K4} & \textbf{K5} & \textbf{K6} & \textbf{K7} & \textbf{K8} & \textbf{Tổng} \\
 \hline
-Layered & 2 & 3 & 3 & 1 & 5 & 5 & 2 & 49 \\
+\textit{Trọng số} & \textit{3} & \textit{3} & \textit{3} & \textit{3} & \textit{2} & \textit{2} & \textit{2} & \textit{1} & \textit{95} \\
 \hline
-Modular monolith & 3 & 3 & 4 & 1 & 5 & 5 & 4 & 57 \\
+Layered & 2 & 3 & 3 & 1 & 3 & 5 & 5 & 2 & 55 \\
 \hline
-Microkernel & 3 & 4 & 3 & 2 & 4 & 2 & 5 & 53 \\
+Modular monolith & 3 & 3 & 4 & 1 & 4 & 5 & 5 & 4 & 65 \\
 \hline
-Service-based (4 đến 6 dịch vụ) & 4 & 4 & 4 & 4 & 3 & 3 & 4 & 64 \\
+Microkernel & 3 & 4 & 3 & 2 & 3 & 4 & 2 & 5 & 59 \\
 \hline
-Event-driven (có message broker) & 4 & 4 & 3 & 4 & 2 & 2 & 4 & 57 \\
+Service-based & 4 & 4 & 4 & 4 & 4 & 3 & 3 & 4 & 72 \\
 \hline
-Microservices & 3 & 3 & 3 & 5 & 1 & 1 & 5 & 51 \\
+Event-driven & 4 & 4 & 3 & 4 & 3 & 2 & 2 & 4 & 63 \\
 \hline
-Hybrid đề xuất: modular monolith ở trung tâm, Gate Agent tại nhà máy, liên kết bằng outbox & 5 & 5 & 4 & 5 & 4 & 4 & 4 & 77 \\
+Microservices & 3 & 3 & 2 & 5 & 3 & 1 & 1 & 5 & 54 \\
+\hline
+\textbf{Phương án kết hợp} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{4} & \textbf{4} & \textbf{85} \\
 \hline
 \end{tabularx}
 \end{table}
 
-Điểm là đánh giá của nhóm trong bối cảnh TMC; cơ sở từng điểm được nêu trong bảng phân tích bên dưới.
+Trong các style đơn lẻ, service-based đạt điểm cao nhất (72) vì là style duy nhất vừa có nhiều đơn vị triển khai vừa giữ được ACID; modular monolith (65) đứng thứ hai nhờ chi phí thấp và toàn vẹn dữ liệu tốt nhưng bị loại bởi K4. Event-driven và microservices có điểm cao ở K4 nhưng bị kéo xuống bởi chi phí vận hành và toàn vẹn dữ liệu. Phương án kết hợp (85) giữ được điểm mạnh của service-based và modular monolith, đồng thời khắc phục điểm yếu về K4 của modular monolith và về chi phí của service-based.
 
-\subsubsection*{Phân tích từng style trong bối cảnh TMC}
+\subsubsection{Kết luận về architecture style}\label{sec:style-decision}
+Style được chọn là \textbf{phương án kết hợp gồm hai đơn vị triển khai} (Hình~\ref{fig:quantum-overview}):
+\begin{itemize}
+    \item \textbf{Central Quantum -- modular monolith:} một đơn vị triển khai tại trung tâm dữ liệu, gồm các module ứng với các subdomain, dùng chung một cơ sở dữ liệu nhưng mỗi module sở hữu dữ liệu của mình và chỉ giao tiếp với module khác qua interface công khai hoặc sự kiện trong tiến trình.
+    \item \textbf{Gate Quantum -- Gate Agent theo kiểu microkernel kết hợp ports and adapters:} một đơn vị triển khai tại mỗi nhà máy. Lõi xử lý xác thực mã QR, quyết định cho qua và lưu trữ cục bộ; thiết bị quét và cổng xoay của từng nhà cung cấp được cắm vào qua các adapter.
+    \item \textbf{Liên kết giữa hai quantum bằng transactional outbox:} bất đồng bộ, chuyển giao ít nhất một lần, idempotent theo mã sự kiện, không dùng message broker.
+\end{itemize}
+Xét theo hình thức, đây là service-based với hai dịch vụ thô.
 
-\begin{table}[H]
-\centering
-\caption{Phân tích từng style trong bối cảnh TMC}
-\small
-\renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{2.2cm}|}
-\hline
-\textbf{Style} & \textbf{Ưu điểm trong bối cảnh TMC} & \textbf{Nhược điểm trong bối cảnh TMC} & \textbf{Kết luận} \\
-\hline
-Layered & Đơn giản, nhóm quen thuộc, chi phí thấp nhất & Phân rã kỹ thuật nên một thay đổi nghiệp vụ chạm nhiều tầng; xử lý tập trung ở trung tâm nên mất mạng thì cổng ngừng và có thể mất giao dịch (NFR-02, NFR-07) & Loại \\
-\hline
-Modular monolith & Ranh giới theo domain; giao dịch ACID giữ các invariant mạnh (INV-01, INV-09); chi phí thấp & Chỉ có một đơn vị triển khai nên xử lý tại cổng không chạy độc lập khi mất kết nối & Dùng cho phía trung tâm \\
-\hline
-Microkernel & Thêm thiết bị xác thực hoặc loại cổng xoay bằng plugin, khớp nguyên tắc Open/Closed và NFR-09 & Chốt kỳ và báo cáo không có tính plugin; tăng bề mặt tấn công; khung plugin tốn công với nhóm nhỏ & Dùng như kỹ thuật bên trong Gate Agent \\
-\hline
-Service-based (4 đến 6 dịch vụ) & Mỗi dịch vụ một domain; Gate là dịch vụ riêng; dùng chung CSDL nên giữ được ACID & Tách trung tâm thành nhiều tiến trình gọi nhau qua mạng, tăng chi phí vận hành khi tải thấp & Là nền tảng của hybrid, rút gọn còn hai dịch vụ \\
-\hline
-Event-driven (có broker) & Bất đồng bộ giữa Gate và Central, giữa Central và HR/Payroll; gửi lại khi lỗi & Phải vận hành broker, xử lý thứ tự và trùng lặp thông điệp với tải vài giao dịch/giây; thêm bề mặt bảo mật & Chỉ dùng outbox, không dùng broker \\
-\hline
-Microservices & Độc lập tối đa về triển khai và mở rộng & Chi phí vận hành cao so với 0,44 giao dịch/giây mỗi nhà máy; saga làm khó giữ toàn vẹn dữ liệu; nhóm nhỏ khó duy trì & Loại \\
-\hline
-\end{tabularx}
-\end{table}
+\paragraph{Vì sao không chọn nguyên dạng service-based hoặc event-driven.} Service-based với 4--6 dịch vụ tại trung tâm chỉ thêm lời gọi mạng và chi phí vận hành mà không mang lại lợi ích khi tải trung tâm thấp; vì vậy trung tâm được giữ là một khối modular monolith. Event-driven với broker giải quyết tốt việc chuyển dữ liệu khi mất kết nối, nhưng transactional outbox đạt cùng mục tiêu với chi phí thấp hơn nhiều ở mức tải hiện tại.
 
-\subsubsection*{Kết luận về architecture style}
-Style được chọn: hybrid gồm hai đơn vị triển khai. Central Quantum là modular monolith, mỗi module ứng với một subdomain. Gate Quantum là Gate Agent tại mỗi nhà máy, bên trong dùng ports and adapters và plugin kiểu microkernel cho thiết bị xác thực và adapter cổng xoay. Hai phía liên kết bất đồng bộ bằng transactional outbox, idempotent theo eventId, không dùng message broker. Về hình thức, đây là service-based với hai dịch vụ thô.
+\paragraph{Cách style đáp ứng các đặc tính dẫn dắt.}
+\begin{itemize}
+    \item \textbf{Performance:} đường xử lý lượt quét chỉ dùng dữ liệu cục bộ tại Gate Agent và một lời gọi tới cổng xoay trong mạng nhà máy.
+    \item \textbf{Reliability:} dữ liệu được lưu bền vững tại Gate Agent trước khi báo thành công; outbox bảo đảm dữ liệu được gửi bù khi kết nối được khôi phục.
+    \item \textbf{Data Integrity:} giao dịch ACID tại Central Quantum bảo vệ các bất biến; tính idempotent theo mã sự kiện ngăn bản ghi trùng khi gửi lại.
+\end{itemize}
+Security được bảo đảm như một đặc tính nền tảng: xác thực, phân quyền và audit tập trung tại Central Quantum; Gate Agent không cần tài khoản người dùng để xử lý lượt quét mà dựa vào chữ ký của mã QR.
 
-Lý do chọn:
+\paragraph{Các đánh đổi được chấp nhận.}
+\begin{itemize}
+    \item \textbf{Nhất quán cuối cùng giữa hai quantum:} thay đổi trạng thái credential tại trung tâm được phản ánh tại cổng với độ trễ tối đa 60 giây khi có kết nối (NFR-SEC-06). Rủi ro này được giới hạn thêm nhờ mã QR động có thời hạn ngắn (NFR-SEC-05).
+    \item \textbf{Độ phức tạp đồng bộ:} hệ thống phải duy trì cơ chế đồng bộ hai chiều, outbox, giám sát và gửi bù dữ liệu chưa đồng bộ.
+    \item \textbf{Triển khai trung tâm theo khối:} nâng cấp một module tại trung tâm cần khởi động lại toàn bộ Central Quantum; điều này chấp nhận được vì cổng vẫn hoạt động độc lập trong thời gian đó.
+\end{itemize}
 
-Reliability: lưu bền vững cục bộ trước khi xác nhận; giao dịch ACID tại trung tâm.
+\paragraph{Liên hệ với vấn đề phát sinh.} Style được chọn giải quyết vấn đề \textit{mất kết nối} ở mức cấu trúc: Gate Agent là một đơn vị triển khai tự chủ có kho dữ liệu riêng, nên việc ra vào và ghi nhận chấm công không phụ thuộc vào đường truyền tới trung tâm; outbox bảo đảm không mất và không trùng dữ liệu khi đồng bộ lại. Đối với vấn đề \textit{mã QR tĩnh}, kiến trúc microkernel và ports and adapters của Gate Agent cho phép đặt bộ kiểm tra chữ ký và thời hạn mã QR thành một thành phần riêng trong lõi, trong khi việc ký mã QR nằm ở Central Quantum -- nơi duy nhất giữ khóa bí mật. Các quyết định này được ghi nhận chính thức trong ADR-04 và ADR-05 (Mục~\ref{sec:architecture-decisions}).
 
-Performance: đường xử lý lần quét chỉ dùng dữ liệu cục bộ.
-
-Security: RBAC và audit tập trung ở trung tâm.
-
-Hai quantum: Gate Agent chạy độc lập và offline; trung tâm bảo trì mà không dừng cổng.
-
-Chi phí: chỉ hai đơn vị triển khai, không có broker.
-
-Các đánh đổi kiến trúc:
-
-Nhất quán cuối cùng: Dữ liệu giữa Gate Quantum và Central Quantum có thể tạm thời không đồng nhất. Việc thu hồi mã QR được phản ánh tại các trạm cổng với độ trễ tối đa 60 giây (INV-02, đề xuất).
-
-Độ phức tạp tích hợp: Hệ thống phải duy trì cơ chế đồng bộ hai chiều, transactional outbox và cơ chế giám sát, gửi lại các giao dịch chưa được đồng bộ.
-
-Phụ thuộc vào Central Quantum: Khi Central Quantum gặp sự cố, các chức năng báo cáo và đồng bộ với trung tâm tạm thời không hoạt động. Tuy nhiên, Gate Quantum vẫn tiếp tục thực hiện kiểm soát ra vào độc lập, nhờ đó sự cố tại trung tâm không làm gián đoạn hoạt động tại cổng.
-
-\subsection{Kiến trúc logic}
+\subsection{Kiến trúc logic}\label{sec:logical-architecture}
 Kiến trúc logic xác định các component của hệ thống TMC: mỗi component chịu trách nhiệm gì, đảm nhận FR nào, sở hữu dữ liệu gì và giao tiếp với nhau ra sao. Phần này chưa gắn với máy chủ hay công nghệ cụ thể; việc đặt component lên node thuộc kiến trúc vật lý (mục 6.4).
 
 Component được xác định theo ba bước:
@@ -473,7 +527,7 @@ Mất kết nối, quá ngưỡng & Fail-closed: cổng không tự mở; bảo 
 
 Giá trị ngưỡng mất kết nối sẽ được chốt cùng giảng viên, như đã nêu ở mục 5.2. Khi có mạng trở lại, luồng F2 gửi bù toàn bộ outbox; eventId bảo đảm không tạo bản ghi trùng.
 
-\subsection{Kiến trúc vật lý}
+\subsection{Kiến trúc vật lý}\label{sec:physical-architecture}
 Kiến trúc vật lý xác định cách thức các thành phần Component được ánh xạ và triển khai trên Nodes, môi trường thực thi, cấu hình mạng và đường truyền vật lý, nhằm hiện thực hóa các mục tiêu về hiệu năng, độ tin cậy không mất mát dữ liệu và tính sẵn sàng/ khả năng tự vận hành offline.
 
 \subsubsection{Lựa chọn Topology triển khai}
@@ -558,3 +612,6 @@ Central Cache Server Node (Trung tâm) & Redis Standalone / Cluster in-memory. &
 \begin{itemize}
     \item C5 gọi sang API của Hệ thống HR/Payroll qua kênh truyền mạng riêng (Dedicated Leased Line / MPLS) hoặc HTTPS REST API bảo vệ bằng IP Whitelisting và OAuth 2.0 / Mutual TLS.
 \end{itemize}
+
+\subsection{Các góc nhìn kiến trúc}\label{sec:views}
+% TODO (gói D): module views, component-and-connector views, allocation views.
