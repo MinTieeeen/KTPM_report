@@ -18,14 +18,14 @@ KTPM_report/
 │   ├── 5_Architecture_Characteristics.tex # Đặc tính kiến trúc, top-3, trade-off
 │   ├── 6_Architecture_Structure.tex       # Quantum, chọn style, kiến trúc logic và vật lý
 │   ├── 7_Architecture_Decisions.tex       # ADR
-│   └── 8_Design_Principles.tex            # Nguyên tắc thiết kế, SOLID, tổ chức mã nguồn
+│   └── 8_Design_Principles.tex            # Nguyên tắc thiết kế DP-01–DP-17, SOLID, kiểm tra tuân thủ
 ├── figures/                  # Hình dùng trong báo cáo, mỗi thư mục con ứng với một phần
 │   ├── common/               # Logo, hình dùng chung
 │   ├── 04_domain_model/      # Lược đồ lớp
-│   ├── 06_architecture_structure/  # Sơ đồ component, sơ đồ triển khai
-│   ├── 08_design_principles/ # Cấu trúc module
+│   ├── 06_architecture_structure/  # Quantum, module views, component, sequence, deployment
+│   ├── 08_design_principles/ # Lược đồ lớp port/adapter (SOLID)
 │   └── appendix_use_case/    # Sơ đồ use case (tiền tố uc_)
-└── build/                    # Kết quả build (bị .gitignore)
+└── build/                    # Kết quả build: chỉ main.pdf được track, các file phụ bị .gitignore
 ```
 
 File nguồn sơ đồ (draw.io) và các bản nháp cũ **không** nằm trong thư mục này mà ở `../artifacts/` (cùng cấp với `KTPM_report/`):
@@ -51,3 +51,5 @@ latexmk -pdf -outdir=build main.tex
 ```
 
 Kết quả nằm ở `build/main.pdf`. Trong VS Code (LaTeX Workshop), đặt `outDir` là `build`.
+
+`build/main.pdf` được đưa vào git để theo dõi bản PDF qua từng commit: build lại trước khi commit để PDF khớp với mã nguồn.

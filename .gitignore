@@ -1,5 +1,9 @@
 # ===== Kết quả build LaTeX =====
-build/
+# Bỏ qua mọi file trong build/, NGOẠI TRỪ build/main.pdf (được track để dễ theo dõi bản PDF qua từng commit)
+build/*
+!build/main.pdf
+
+# File phụ của LaTeX nếu build không dùng -outdir
 *.aux
 *.bbl
 *.bcf
@@ -21,7 +25,7 @@ build/
 *.snm
 *.vrb
 _minted*/
-# PDF tạo ra ở thư mục gốc khi build không dùng -outdir
+# PDF tạo ra ở thư mục gốc khi build không dùng -outdir (bản chính thức là build/main.pdf)
 /main.pdf
 
 # ===== Tài liệu kế hoạch chỉnh sửa (chỉ dùng nội bộ, không push) =====
