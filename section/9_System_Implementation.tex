@@ -6,8 +6,9 @@ với cấu trúc kiến trúc ở Chương~\ref{sec:architecture-structure}, c�
 OpenAPI của dự án.
 
 \noindent\textit{Trạng thái bản nháp:} Mục 9.5 và 9.6 đã được xây dựng từ đặc tả API, sitemap và
-mã nguồn backend trên nhánh phát triển. Các kết quả build, kiểm thử, ảnh chụp giao diện và số liệu
-đo đạc sẽ được bổ sung sau khi các nhánh được tích hợp.
+mã nguồn backend trên nhánh phát triển. Backend đã được kiểm tra bằng một lượt build sạch toàn bộ
+reactor và contract test đầu tiên cho API quét. Integration test xuyên suốt, ảnh chụp giao diện và
+số liệu đo đạc vẫn sẽ được bổ sung sau khi các nhánh được tích hợp.
 
 % TODO(R1-9.1--9.4): Người phụ trách bổ sung nội dung và bỏ các ghi chú bản nháp trước khi nộp.
 \subsection{Phạm vi hiện thực hệ thống}\label{sec:implementation-scope}
@@ -136,7 +137,7 @@ Sitemap và wireframe & Đã thiết kế & 13 đặc tả màn hình/trạng th
 \hline
 Frontend React & Chưa hoàn tất & Các entry point đã có nhưng feature UI vẫn cần hiện thực \\
 \hline
-Kiểm thử và đo đạc & Chưa xác nhận & Cần bổ sung kết quả CI, contract test, integration test và ảnh chụp demo \\
+Kiểm thử và đo đạc & Đã kiểm tra một phần & Build sạch 5 module thành công; 2 contract test cho \texttt{POST /scan} thành công. Còn thiếu integration test, CI và ảnh chụp demo \\
 \hline
 \end{tabularx}
 \end{table}
@@ -273,14 +274,25 @@ từ màn hình, thao tác người dùng, endpoint, controller tới yêu cầu
 Các controller tương ứng với các endpoint cốt lõi đã xuất hiện trên nhánh backend, gồm
 \texttt{AuthController}, \texttt{QrTokenController}, \texttt{EmployeeController},
 \texttt{StationController}, \texttt{SyncController}, \texttt{ScanController},
-\texttt{StatusController} và các controller của simulator. Tuy nhiên, việc một endpoint có mã nguồn
-chưa đủ để kết luận contract đã được tuân thủ hoàn toàn. Trước khi chốt báo cáo cần thực hiện các công
-việc sau:
+\texttt{StatusController} và các controller của simulator. Ngày 22/11/2026, toàn bộ reactor gồm
+\texttt{sync-contract}, \texttt{gate-agent}, \texttt{central} và \texttt{turnstile-sim} đã được
+kiểm tra bằng lệnh \texttt{mvn -B clean verify}; cả 5 project trong reactor đều báo
+\texttt{BUILD SUCCESS}. Hai contract test MockMvc tại biên HTTP của \texttt{POST /scan} cũng thành
+công: mã trạm hợp lệ \texttt{BD-IN-01} được tiếp nhận, còn mã sai định dạng trả HTTP 400,
+\texttt{application/problem+json}, mã lỗi \texttt{VALIDATION\_ERROR} và không đi vào use case.
+
+Quá trình viết test theo chu trình red--green phát hiện một sai lệch thực tế: schema
+\texttt{StationId} trong OpenAPI yêu cầu mẫu
+\texttt{\^{}[A-Z]\{2\}-(IN|OUT)-[0-9]\{2\}\$}, trong khi DTO ban đầu chỉ kiểm tra không rỗng.
+Ràng buộc Bean Validation đã được bổ sung vào \texttt{ScanRequest} để đồng bộ implementation với
+hợp đồng. Kết quả này mới xác nhận một lát cắt quan trọng, chưa đủ để kết luận toàn bộ 20 operation
+đều tuân thủ contract. Trước khi chốt báo cáo cần thực hiện các công việc sau:
 
 \begin{itemize}
     \item hợp nhất nhánh backend và frontend vào nhánh chính, sau đó chạy toàn bộ pipeline CI;
     \item so sánh tài liệu do Springdoc sinh tại \texttt{/v3/api-docs} với bốn tệp OpenAPI chuẩn;
-    \item bổ sung contract test, integration test và test cho các mã lỗi quan trọng;
+    \item mở rộng contract test sang các operation còn lại, bổ sung integration test và test cho
+    các mã lỗi quan trọng;
     \item chạy kịch bản demo online/offline, timeout và gửi bù outbox, ghi lại kết quả thực tế;
     \item bổ sung ảnh chụp các màn hình đã hiện thực và thay các mô tả trạng thái dự kiến bằng bằng
     chứng từ hệ thống chạy được.
