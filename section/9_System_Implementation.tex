@@ -10,23 +10,164 @@ mã nguồn backend trên nhánh phát triển. Backend đã được kiểm tra
 reactor và contract test đầu tiên cho API quét. Integration test xuyên suốt, ảnh chụp giao diện và
 số liệu đo đạc vẫn sẽ được bổ sung sau khi các nhánh được tích hợp.
 
-% TODO(R1-9.1--9.4): Người phụ trách bổ sung nội dung và bỏ các ghi chú bản nháp trước khi nộp.
 \subsection{Phạm vi hiện thực hệ thống}\label{sec:implementation-scope}
 
-\textit{Phần này sẽ được bổ sung khi chốt phạm vi MVP và trạng thái tích hợp cuối cùng.}
+Phạm vi hiện thực của MVP được giới hạn theo hai quantum đã chọn ở Chương~\ref{sec:architecture-structure}.
+Tại nhà máy, Gate Agent hiện thực G1--G4 và một phần G5: nhận và xác minh QR, áp dụng quy tắc truy
+cập, điều khiển cổng xoay, lưu SQLite, duy trì outbox, đồng bộ dữ liệu tham chiếu và cung cấp danh
+sách lượt quét cần đối soát. Tại trung tâm, modular monolith hiện thực C1, C2, C3 và C7: tiếp nhận sự
+kiện từ gate, quản lý nhân viên và credential QR, theo dõi trạm, đăng nhập và phân quyền. Thư viện
+\texttt{sync-contract} chứa DTO dùng chung giữa hai quantum; \texttt{turnstile-sim} thay thế thiết
+bị vật lý trong môi trường phát triển.
+
+Các chức năng chốt kỳ, tích hợp HR/Payroll, báo cáo nghiệp vụ, audit nâng cao và cấu hình toàn hệ
+thống thuộc C4, C5, C6, C8 và C9 không nằm trong lát cắt MVP. Giao diện React được tổ chức thành hai
+build target cho Gate và Central, nhưng tại thời điểm lập bản nháp mới chỉ có entry point và khung
+tích hợp; vì vậy báo cáo chưa coi các màn hình trong sitemap là đã hoàn tất. Tương tự, các kịch bản
+E2E T1--T11 và load test T9 đã có đặc tả nhưng chưa có đủ script và kết quả đo để dùng làm bằng chứng.
+
+Tiêu chí hoàn thành cho phần backend của lát cắt này gồm: build được bốn module Maven, database được
+khởi tạo bằng migration, endpoint cốt lõi khớp hợp đồng OpenAPI, Gate Agent vẫn ra quyết định cục bộ
+khi Central gián đoạn và sự kiện có thể được gửi bù từ outbox. Trong các tiêu chí đó, build toàn bộ
+reactor và một lát cắt contract của \texttt{POST /scan} đã được xác nhận; kiểm thử xuyên suốt trạng
+thái online/offline vẫn là công việc cần bổ sung.
 
 \subsection{Công nghệ và môi trường phát triển}\label{sec:implementation-technology}
 
-\textit{Phần này sẽ được bổ sung từ ADR-10 và cấu hình build thực tế của dự án.}
+Backend sử dụng Java 21 và Spring Boot 3.5.6, được quản lý bằng một Maven multi-module project.
+Central dùng Spring Modulith 1.4.3 để biểu diễn ranh giới module trong cùng tiến trình; Gate Agent
+dùng Spring JDBC thay vì JPA để kiểm soát rõ các giao dịch SQLite. Các phiên bản dưới đây được lấy
+trực tiếp từ parent POM và tệp cấu hình ứng dụng, thay vì chỉ dựa vào lựa chọn dự kiến trong ADR.
+
+\begin{table}[H]
+\centering
+\caption{Công nghệ chính của bản hiện thực MVP}
+\label{tab:implementation-technology-stack}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Nhóm} & \textbf{Công nghệ/phiên bản} & \textbf{Vai trò trong hệ thống} \\
+\hline
+Nền tảng backend & Java 21, Spring Boot 3.5.6 & REST API, validation, security, scheduling, actuator và cấu hình ứng dụng \\
+\hline
+Tổ chức Central & Spring Modulith 1.4.3 & Giữ C1, C2, C3 và C7 thành các module nghiệp vụ có biên rõ trong modular monolith \\
+\hline
+Lưu trữ & PostgreSQL 16, SQLite JDBC 3.50.3.0, Flyway & PostgreSQL cho Central; SQLite WAL cho mỗi Gate Agent; migration quản lý lược đồ \\
+\hline
+Khả năng phục hồi & Resilience4j 2.3.0 & Timeout và circuit breaker khi Gate Agent gọi cổng xoay \\
+\hline
+Hợp đồng và tài liệu & OpenAPI 3.0.3, Springdoc 2.8.13 & Đặc tả API chuẩn, Swagger UI và tài liệu runtime tại \texttt{/v3/api-docs} \\
+\hline
+Frontend & React 18.3.1, TypeScript 5.6.3, Vite 5.4.10 & Hai build target: Kiosk tại Gate và Portal/Admin tại Central \\
+\hline
+Kiểm thử và đóng gói & JUnit 5, MockMvc, Mockito, JaCoCo 0.8.13, Docker Compose & Contract test, báo cáo coverage, đóng gói và dựng topology demo \\
+\hline
+\end{tabularx}
+\end{table}
+
+Central mặc định chạy ở cổng 8080 và kết nối PostgreSQL; hai Gate Agent demo được ánh xạ ra cổng
+8081 và 8082, mỗi instance có một volume SQLite riêng. Hai simulator chạy ở cổng 9001 và 9002.
+\path{deploy/docker-compose.yml} tách mạng \texttt{wan} khỏi hai mạng LAN nhà máy
+\texttt{lan-bd} và \texttt{lan-la}, nhờ đó script demo có thể ngắt kết nối Gate--Central mà vẫn giữ
+đường truyền từ Gate tới cổng xoay. Các khóa ký, mật khẩu và API key thật được đưa vào qua biến môi
+trường hoặc tệp secret; giá trị mặc định trong repository chỉ phục vụ profile demo.
+
+Môi trường build yêu cầu JDK 21, Maven 3.9+, Node.js 22, npm 10 và Docker Compose v2. Cấu hình thời
+gian của Jackson và Hibernate dùng UTC; Central tắt Open Session in View và chỉ cho Hibernate kiểm
+tra schema, còn Flyway chịu trách nhiệm tạo và nâng cấp database. Gate Agent bật SQLite WAL,
+\texttt{synchronous=FULL}, foreign key và giới hạn HikariCP còn một kết nối để tuần tự hóa thao tác
+ghi, phù hợp với tải đỉnh dự kiến 2--5 lượt quét mỗi giây tại một nhà máy.
 
 \subsection{Cấu trúc mã nguồn và tổ chức module}\label{sec:source-organization}
 
-\textit{Phần này sẽ được bổ sung từ implementation view và cấu trúc repository sau khi hợp nhất
-các nhánh.}
+Repository dùng một parent POM khai báo bốn module build: \texttt{sync-contract},
+\texttt{gate-agent}, \texttt{central} và \texttt{simulators/turnstile-sim}. Mã frontend, tài liệu,
+cấu hình triển khai và kiểm thử hệ thống được đặt cạnh các module Java nhưng không tham gia reactor
+Maven. Cách bố trí cấp cao như sau:
+
+\begin{verbatim}
+tmc/
+|-- sync-contract/              DTO va hang so giao tiep Q1--Q2
+|-- gate-agent/                 G1--G5, SQLite, sync va turnstile adapter
+|-- central/                    C1, C2, C3, C7 trong modular monolith
+|-- simulators/turnstile-sim/   bo gia lap cong xoay
+|-- web/                        React/TypeScript, target gate va central
+|-- docs/                       SRS, OpenAPI, sitemap va wireframe
+|-- deploy/                     Dockerfile, Compose, env va script demo
+`-- tests/                      dac ta E2E va load test
+\end{verbatim}
+
+Bên trong Gate Agent, package cấp một bám theo component: \texttt{access}, \texttt{turnstile},
+\texttt{localstore}, \texttt{sync} và \texttt{guard}. Central được chia theo capability
+\texttt{ingestion}, \texttt{employee}, \texttt{station} và \texttt{iam}. Mỗi capability tiếp tục
+tách thành \texttt{api}, \texttt{application}, \texttt{domain} và \texttt{infrastructure}. Tầng
+\texttt{domain} chứa thực thể, value object và port; tầng \texttt{application} điều phối use case;
+\texttt{api} chuyển đổi HTTP hoặc công bố API module; \texttt{infrastructure} hiện thực persistence,
+security và lời gọi ra ngoài. Phụ thuộc được hướng vào domain thông qua interface như
+\texttt{TurnstileGateway}, \texttt{QrTokenSigner}, \texttt{IngestionStore} và
+\texttt{SyncClient}.
+
+\texttt{sync-contract} không phụ thuộc vào hai ứng dụng triển khai. Module này đóng gói
+\texttt{EventBatch}, \texttt{BatchAck}, \texttt{SnapshotDelta}, \texttt{Heartbeat}, cấu trúc QR và
+hằng số version/path; cả Gate Agent lẫn Central cùng biên dịch dựa trên một định nghĩa. Migration
+được giữ cùng module sở hữu dữ liệu: Central có các migration riêng cho employee, ingestion,
+station, IAM và event publication; Gate Agent có migration SQLite tạo local store và outbox.
 
 \subsection{Thiết kế chi tiết các module được lựa chọn}\label{sec:selected-module-design}
 
-\textit{Phần này sẽ được bổ sung bằng lược đồ lớp và mô tả chi tiết các module được chọn.}
+Phần này chọn ba lát cắt có ảnh hưởng trực tiếp tới các thuộc tính kiến trúc ưu tiên: xử lý lượt quét
+tại Gate, đồng bộ dữ liệu giữa hai quantum và phát hành QR tại Central. Các mô tả dùng tên lớp thật
+trong mã nguồn để có thể truy vết từ thiết kế tới implementation.
+
+\subsubsection{Lát cắt xử lý lượt quét tại Gate}
+
+\texttt{ScanController} nhận \texttt{ScanRequest}, thực hiện Bean Validation rồi tạo
+\texttt{ScanCommand} với thời điểm lấy từ \texttt{Clock}. \texttt{ProcessScanUseCase} là điểm điều
+phối duy nhất của luồng. Use case đọc \texttt{StationConfig}, phân tích và xác minh token qua
+\texttt{QrTokenVerifier}, tra credential và public key, sau đó giao \texttt{ScanContext} cho
+\texttt{AccessRules}. Việc giữ luật trong các lớp domain giúp controller, SQLite và HTTP adapter
+không trở thành nơi chứa quyết định nghiệp vụ.
+
+Các interface \texttt{ScanAttemptStore}, \texttt{TransactionStore}, \texttt{NonceRegistry} và
+\texttt{TurnstileGateway} là port đi ra. \texttt{SqliteScanStore} hiện thực các port lưu trữ và ghi
+outbox trong local database; \texttt{HttpTurnstileAdapter} hoặc \texttt{FakeTurnstileGateway} hiện
+thực port thiết bị. Lượt quét được ghi trước khi gọi cổng và \texttt{eventId} đồng thời được dùng làm
+\texttt{requestId}, nhờ đó retry không tạo hai lệnh mở độc lập. Adapter HTTP dùng timeout và circuit
+breaker riêng theo cổng; khi phản hồi mở cổng không chắc chắn, adapter truy vấn trạng thái command
+trước khi kết luận thất bại.
+
+\subsubsection{Lát cắt local store và đồng bộ}
+
+G3 gom các adapter SQLite cho credential, station, scan, outbox và sync state. Outbox record chỉ
+được xóa hoặc đánh dấu đã gửi sau khi Central trả acknowledgement. Ở G4,
+\texttt{OutboxPusher}, \texttt{SnapshotPuller}, \texttt{HeartbeatSender} và
+\texttt{NonceJanitor} là bốn tác vụ nền độc lập. \texttt{RestSyncClient} hiện thực
+\texttt{SyncClient}, thêm \texttt{X-Gate-Key} và gọi ba endpoint trong hợp đồng sync. Chu kỳ push,
+pull, heartbeat, batch size và timeout đều nằm trong \texttt{application.yml} để có thể thay đổi theo
+môi trường mà không sửa mã.
+
+Tại Central, \texttt{SyncController} lấy danh tính gate đã được \texttt{GateApiKeyFilter} xác thực.
+Controller chuyển từng loại request cho use case nhận batch, lấy snapshot delta hoặc ghi heartbeat.
+Các lớp tương ứng là \texttt{IngestEventBatchUseCase}, \texttt{GetSnapshotDeltaUseCase} và
+\texttt{RecordHeartbeatUseCase}. Adapter JDBC dùng \texttt{eventId} để bảo đảm tiếp nhận lặp an
+toàn. Dữ liệu tham chiếu thay đổi được ghi thành \texttt{RefChange}; Gate kéo delta theo version
+thay vì tải lại toàn bộ snapshot.
+
+\subsubsection{Lát cắt quản lý nhân viên, QR và IAM}
+
+Trong C2, hai use case cấp và thu hồi quản lý vòng đời credential. Lớp
+\texttt{GenerateQrTokenUseCase} tạo claims ngắn hạn và gọi port \texttt{QrTokenSigner}; adapter
+Ed25519 tạo chuỗi token đã ký. Các repository JPA lưu employee, credential và signing key trong
+PostgreSQL. Sự kiện
+\texttt{QrCredentialChanged} và \texttt{SigningKeyPublished} được công bố để C1 đưa thay đổi vào
+snapshot dành cho Gate.
+
+C7 tách xác minh mật khẩu và phát hành token thành các port \texttt{PasswordVerifier} và
+\texttt{TokenIssuer}, được hiện thực lần lượt bằng BCrypt và JWT RS256. \texttt{SecurityConfig}
+phân biệt ba loại caller: endpoint đăng nhập công khai, API người dùng dùng Bearer JWT và API sync
+dùng gate API key. Cách tách này ngăn client trình duyệt giả danh Gate Agent, đồng thời cho phép thay
+cơ chế xác thực machine-to-machine mà không thay đổi các use case ingestion.
 
 \subsection{Hiện thực các chức năng cốt lõi}\label{sec:core-function-implementation}
 
@@ -279,7 +420,7 @@ Các controller tương ứng với các endpoint cốt lõi đã xuất hiện 
 kiểm tra bằng lệnh \texttt{mvn -B clean verify}; cả 5 project trong reactor đều báo
 \texttt{BUILD SUCCESS}. Hai contract test MockMvc tại biên HTTP của \texttt{POST /scan} cũng thành
 công: mã trạm hợp lệ \texttt{BD-IN-01} được tiếp nhận, còn mã sai định dạng trả HTTP 400,
-\texttt{application/problem+json}, mã lỗi \texttt{VALIDATION\_ERROR} và không đi vào use case.
+\path{application/problem+json}, mã lỗi \texttt{VALIDATION\_ERROR} và không đi vào use case.
 
 Quá trình viết test theo chu trình red--green phát hiện một sai lệch thực tế: schema
 \texttt{StationId} trong OpenAPI yêu cầu mẫu
