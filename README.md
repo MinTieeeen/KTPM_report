@@ -18,7 +18,8 @@ KTPM_report/
 │   ├── 5_Architecture_Characteristics.tex # Đặc tính kiến trúc, top-3, trade-off
 │   ├── 6_Architecture_Structure.tex       # Quantum, chọn style, kiến trúc logic và vật lý
 │   ├── 7_Architecture_Decisions.tex       # ADR
-│   └── 8_Design_Principles.tex            # Nguyên tắc thiết kế DP-01–DP-17, SOLID, kiểm tra tuân thủ
+│   ├── 8_Design_Principles.tex            # Nguyên tắc thiết kế DP-01–DP-17, SOLID, kiểm tra tuân thủ
+│   └── 9_System_Implementation.tex        # Hiện thực chức năng cốt lõi và thiết kế API
 ├── figures/                  # Hình dùng trong báo cáo, mỗi thư mục con ứng với một phần
 │   ├── common/               # Logo, hình dùng chung
 │   ├── 04_domain_model/      # Lược đồ lớp

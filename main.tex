@@ -4,13 +4,11 @@
 \usepackage[fontsize=11pt]{scrextend} %set font=13pt
 \linespread{1.2}
 \usepackage[paperheight=29.7cm,paperwidth=21cm,right=2cm,left=1.8cm,top=2cm,bottom=2.5cm]{geometry}
-\usepackage{amsmath}
 \usepackage{amsmath, amssymb, txfonts}
 \usepackage{listings}
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{diagbox}
-\usepackage{minted}
 \usepackage{vhistory}
 \usepackage{indentfirst}
 \usepackage{multirow}
@@ -24,7 +22,6 @@
 \renewcommand{\thefigure}{\thesection.\arabic{figure}}
 \usepackage{caption}
 \usepackage{enumerate} % để tùy chỉnh itemize
-\usepackage{array}    % để dùng m{width}
 \captionsetup[figure]{labelsep=space}
 \newtheorem{theorem}{Định lý}[section]
 \newtheorem{defn}{Định nghĩa}[section]
@@ -40,10 +37,8 @@
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{lastpage}
-\usepackage{enumerate}
 \usepackage{tcolorbox}
 \usepackage{changepage}
-\usepackage{hyperref}
 \usepackage[vietnamese]{babel}
 \usepackage[
 backend=biber,
@@ -228,6 +223,7 @@ sorting=ynt
         \vhEntry{1.7}{2026.11.15}{TienHM}{Phần 4: cập nhật luồng nghiệp vụ, bổ sung bất biến INV-01--INV-11 và phân rã subdomain, vẽ lại lược đồ lớp; Phần 5: bổ sung đặc tính Modifiability và đánh đổi Availability -- Security}
         \vhEntry{1.8}{2026.11.15}{TienHM}{Tái cấu trúc Phần 6: so sánh và lựa chọn architecture style, xây dựng kiến trúc logic và kiến trúc vật lý theo từng bước, trình bày module views, component-and-connector views và allocation views; vẽ lại các hình theo chuẩn UML}
         \vhEntry{1.9}{2026.11.16}{TienHM}{Viết lại Phần 7 (ADR-01--ADR-08), bổ sung ADR-09 về đồng bộ nhân viên và ADR-10 về nền tảng công nghệ; tái cấu trúc Phần 8 thành bốn nhóm nguyên tắc DP-01--DP-17, mở rộng phần áp dụng SOLID kèm lược đồ lớp}
+        \vhEntry{1.10}{2026.11.22}{NamVT}{Dựng bản nháp Mục 9.5 và 9.6 từ mã nguồn backend, hợp đồng OpenAPI và sitemap; bổ sung danh mục endpoint và các nội dung cần xác nhận sau tích hợp}
     \end{versionhistory}
     \cleardoublepage
 
@@ -241,7 +237,7 @@ sorting=ynt
     \include{section/6_Architecture_Structure}
     \include{section/7_Architecture_Decisions}
     \include{section/8_Design_Principles}
-    % \include{section/9_Conclusion}
+    \include{section/9_System_Implementation}
     \cleardoublepage
     \nocite{martin2017clean,richards2025fundamentals,clements2010documenting,sommerville2015software,slidesCO3017}
     \printbibliography[heading=bibintoc,title={Tài liệu tham khảo}]
