@@ -5,10 +5,12 @@ nguồn, hiện thực các chức năng cốt lõi và hợp đồng API giữa
 với cấu trúc kiến trúc ở Chương~\ref{sec:architecture-structure}, các quyết định ADR và đặc tả
 OpenAPI của dự án.
 
-\noindent\textit{Trạng thái bản nháp:} Mục 9.5 và 9.6 đã được xây dựng từ đặc tả API, sitemap và
-mã nguồn backend trên nhánh phát triển. Backend đã được kiểm tra bằng một lượt build sạch toàn bộ
-reactor và contract test đầu tiên cho API quét. Integration test xuyên suốt, ảnh chụp giao diện và
-số liệu đo đạc vẫn sẽ được bổ sung sau khi các nhánh được tích hợp.
+\noindent\textit{Trạng thái hiện thực tại thời điểm đối chiếu:} Nội dung chương được cập nhật theo
+commit \texttt{b8a997c} trên nhánh \texttt{main}, nơi mã nguồn backend của bốn module Maven đã được
+hợp nhất. Việc đối chiếu trong chương này dựa trên mã nguồn, cấu hình, migration và hợp đồng API đã
+commit. Repository hiện chưa có test backend thực thi (các thư mục \texttt{src/test} chỉ chứa tệp
+giữ chỗ); các kịch bản E2E và tải mới dừng ở tài liệu hướng dẫn. Vì vậy báo cáo chưa dùng kết quả
+build, test xuyên suốt, ảnh chụp giao diện hay số liệu đo làm bằng chứng hoàn thành.
 
 \subsection{Phạm vi hiện thực hệ thống}\label{sec:implementation-scope}
 
@@ -22,15 +24,16 @@ bị vật lý trong môi trường phát triển.
 
 Các chức năng chốt kỳ, tích hợp HR/Payroll, báo cáo nghiệp vụ, audit nâng cao và cấu hình toàn hệ
 thống thuộc C4, C5, C6, C8 và C9 không nằm trong lát cắt MVP. Giao diện React được tổ chức thành hai
-build target cho Gate và Central, nhưng tại thời điểm lập bản nháp mới chỉ có entry point và khung
+build target cho Gate và Central, nhưng tại thời điểm đối chiếu mới chỉ có entry point và khung
 tích hợp; vì vậy báo cáo chưa coi các màn hình trong sitemap là đã hoàn tất. Tương tự, các kịch bản
 E2E T1--T11 và load test T9 đã có đặc tả nhưng chưa có đủ script và kết quả đo để dùng làm bằng chứng.
 
 Tiêu chí hoàn thành cho phần backend của lát cắt này gồm: build được bốn module Maven, database được
 khởi tạo bằng migration, endpoint cốt lõi khớp hợp đồng OpenAPI, Gate Agent vẫn ra quyết định cục bộ
-khi Central gián đoạn và sự kiện có thể được gửi bù từ outbox. Trong các tiêu chí đó, build toàn bộ
-reactor và một lát cắt contract của \texttt{POST /scan} đã được xác nhận; kiểm thử xuyên suốt trạng
-thái online/offline vẫn là công việc cần bổ sung.
+khi Central gián đoạn và sự kiện có thể được gửi bù từ outbox. Mã nguồn hiện đã chứa đầy đủ lớp và
+cấu hình cho các tiêu chí trên, nhưng repository chưa kèm kết quả kiểm thử có thể tái lập để xác nhận
+chúng ở runtime. Do đó, trạng thái trong chương được phân biệt rõ giữa ``đã có mã nguồn'' và ``đã
+được kiểm chứng bằng test''.
 
 \subsection{Công nghệ và môi trường phát triển}\label{sec:implementation-technology}
 
@@ -61,7 +64,7 @@ Hợp đồng và tài liệu & OpenAPI 3.0.3, Springdoc 2.8.13 & Đặc tả AP
 \hline
 Frontend & React 18.3.1, TypeScript 5.6.3, Vite 5.4.10 & Hai build target: Kiosk tại Gate và Portal/Admin tại Central \\
 \hline
-Kiểm thử và đóng gói & JUnit 5, MockMvc, Mockito, JaCoCo 0.8.13, Docker Compose & Contract test, báo cáo coverage, đóng gói và dựng topology demo \\
+Kiểm thử và đóng gói & JUnit 5, MockMvc, Mockito, JaCoCo 0.8.13, Docker Compose & Các dependency và pipeline đã được khai báo; test thực thi và bằng chứng coverage còn cần bổ sung \\
 \hline
 \end{tabularx}
 \end{table}
@@ -132,15 +135,15 @@ không trở thành nơi chứa quyết định nghiệp vụ.
 Các interface \texttt{ScanAttemptStore}, \texttt{TransactionStore}, \texttt{NonceRegistry} và
 \texttt{TurnstileGateway} là port đi ra. \texttt{SqliteScanStore} hiện thực các port lưu trữ và ghi
 outbox trong local database; \texttt{HttpTurnstileAdapter} hoặc \texttt{FakeTurnstileGateway} hiện
-thực port thiết bị. Lượt quét được ghi trước khi gọi cổng và \texttt{eventId} đồng thời được dùng làm
-\texttt{requestId}, nhờ đó retry không tạo hai lệnh mở độc lập. Adapter HTTP dùng timeout và circuit
-breaker riêng theo cổng; khi phản hồi mở cổng không chắc chắn, adapter truy vấn trạng thái command
-trước khi kết luận thất bại.
+thực port thiết bị. Lượt quét được ghi ở trạng thái \texttt{PENDING} trước khi gọi cổng và
+\texttt{eventId} đồng thời được dùng làm \texttt{requestId}, nhờ đó phía thiết bị có thể nhận diện
+lệnh trùng. Adapter HTTP dùng timeout và circuit breaker riêng theo cổng; khi phản hồi mở cổng không
+chắc chắn, use case truy vấn trạng thái command một lần trước khi kết luận thất bại.
 
 \subsubsection{Lát cắt local store và đồng bộ}
 
 G3 gom các adapter SQLite cho credential, station, scan, outbox và sync state. Outbox record chỉ
-được xóa hoặc đánh dấu đã gửi sau khi Central trả acknowledgement. Ở G4,
+được đánh dấu \texttt{SYNCED} hoặc \texttt{REJECTED} sau khi Central trả acknowledgement. Ở G4,
 \texttt{OutboxPusher}, \texttt{SnapshotPuller}, \texttt{HeartbeatSender} và
 \texttt{NonceJanitor} là bốn tác vụ nền độc lập. \texttt{RestSyncClient} hiện thực
 \texttt{SyncClient}, thêm \texttt{X-Gate-Key} và gọi ba endpoint trong hợp đồng sync. Chu kỳ push,
@@ -206,7 +209,7 @@ request và chuyển lệnh cho \texttt{ProcessScanUseCase}; các quy tắc nghi
 \texttt{access}. Luồng xử lý chính gồm các bước sau:
 
 \begin{enumerate}
-    \item Kiểm tra trạm tồn tại, đang hoạt động và thuộc Gate Agent hiện tại.
+    \item Tra cấu hình trạm trong snapshot cục bộ và kiểm tra trạm tồn tại, đang hoạt động.
     \item Phân tích cấu trúc token, kiểm tra chữ ký Ed25519, thời hạn, credential và nonce.
     \item Áp dụng các quy tắc chống quét lại, anti-passback và chính sách hoạt động khi mất kết nối.
     \item Ghi nhận lần quét và trạng thái ban đầu vào CSDL cục bộ trước khi gọi thiết bị.
@@ -253,14 +256,14 @@ lỗi và chế độ hoạt động, phục vụ trình diễn các kịch bả
 
 \subsubsection{Liên kết với sitemap và giao diện người dùng}
 
-Sitemap của MVP đặc tả ba ứng dụng React độc lập: Kiosk, Portal và Admin. Tổng cộng có 13 màn hình,
+Sitemap của MVP đặc tả ba entry point React: Kiosk, Portal và Admin. Tổng cộng có 13 màn hình,
 trạng thái hoặc thành phần tương tác, từ K-01 đến K-05, AU-01 đến AU-02, P-01 đến P-02 và A-01 đến
 A-04. Mỗi mục trong sitemap được ánh xạ tới endpoint, yêu cầu chức năng và tài liệu wireframe tương
 ứng. Cách tổ chức này cho phép frontend phát triển dựa trên contract trước khi backend được tích hợp.
 
 \begin{table}[H]
 \centering
-\caption{Trạng thái hiện thực các nhóm chức năng tại thời điểm lập bản nháp}
+\caption{Trạng thái hiện thực các nhóm chức năng tại thời điểm đối chiếu}
 \label{tab:implementation-draft-status}
 \small
 \renewcommand{\arraystretch}{1.25}
@@ -268,9 +271,9 @@ A-04. Mỗi mục trong sitemap được ánh xạ tới endpoint, yêu cầu ch
 \hline
 \textbf{Nhóm} & \textbf{Trạng thái} & \textbf{Bằng chứng hiện có} \\
 \hline
-Gate Agent G1--G5 & Có mã nguồn trên nhánh phát triển & Controller, use case, domain model, adapter cổng xoay, SQLite store và đồng bộ outbox \\
+Gate Agent G1--G5 & Đã hợp nhất trên \texttt{main} & Controller, use case, domain model, adapter cổng xoay, SQLite store, outbox và bốn tác vụ đồng bộ nền \\
 \hline
-Central C1, C2, C3, C7 & Có mã nguồn trên nhánh phát triển & Ingestion, employee/QR, station, IAM/JWT và migration dữ liệu \\
+Central C1, C2, C3, C7 & Đã hợp nhất trên \texttt{main} & Ingestion, employee/QR, station, IAM/JWT, Spring Modulith event publication và migration dữ liệu \\
 \hline
 Hợp đồng API & Đã đặc tả & Bốn tài liệu OpenAPI 3.0.3 và bản mô tả Markdown tương ứng \\
 \hline
@@ -278,7 +281,7 @@ Sitemap và wireframe & Đã thiết kế & 13 đặc tả màn hình/trạng th
 \hline
 Frontend React & Chưa hoàn tất & Các entry point đã có nhưng feature UI vẫn cần hiện thực \\
 \hline
-Kiểm thử và đo đạc & Đã kiểm tra một phần & Build sạch 5 module thành công; 2 contract test cho \texttt{POST /scan} thành công. Còn thiếu integration test, CI và ảnh chụp demo \\
+Kiểm thử và đo đạc & Chưa có bằng chứng thực thi trong repository & CI đã khai báo lệnh \texttt{mvn -B verify}, nhưng hiện chưa có test backend; E2E/load test mới có README và thư mục giữ chỗ \\
 \hline
 \end{tabularx}
 \end{table}
@@ -412,29 +415,31 @@ từ màn hình, thao tác người dùng, endpoint, controller tới yêu cầu
 
 \subsubsection{Mức độ hoàn thiện và nội dung cần bổ sung}
 
-Các controller tương ứng với các endpoint cốt lõi đã xuất hiện trên nhánh backend, gồm
+Các controller tương ứng với các endpoint cốt lõi đã được hợp nhất trên \texttt{main}, gồm
 \texttt{AuthController}, \texttt{QrTokenController}, \texttt{EmployeeController},
 \texttt{StationController}, \texttt{SyncController}, \texttt{ScanController},
-\texttt{StatusController} và các controller của simulator. Ngày 22/11/2026, toàn bộ reactor gồm
-\texttt{sync-contract}, \texttt{gate-agent}, \texttt{central} và \texttt{turnstile-sim} đã được
-kiểm tra bằng lệnh \texttt{mvn -B clean verify}; cả 5 project trong reactor đều báo
-\texttt{BUILD SUCCESS}. Hai contract test MockMvc tại biên HTTP của \texttt{POST /scan} cũng thành
-công: mã trạm hợp lệ \texttt{BD-IN-01} được tiếp nhận, còn mã sai định dạng trả HTTP 400,
-\path{application/problem+json}, mã lỗi \texttt{VALIDATION\_ERROR} và không đi vào use case.
+\texttt{StatusController}, \texttt{PendingReconcileController},
+\texttt{FaultInjectionController} và các controller của simulator. Bốn tệp OpenAPI hiện mô tả 19
+path và 20 operation; số lượng này khớp với danh mục ở Bảng~\ref{tab:mvp-api-index}. Ở mức mã nguồn,
+các endpoint đã nối tới use case tương ứng, hai security filter chain đã tách lưu lượng người dùng
+và lưu lượng sync, còn Gate Agent đã có migration SQLite cùng các scheduler push, pull, heartbeat
+và dọn nonce.
 
-Quá trình viết test theo chu trình red--green phát hiện một sai lệch thực tế: schema
-\texttt{StationId} trong OpenAPI yêu cầu mẫu
-\texttt{\^{}[A-Z]\{2\}-(IN|OUT)-[0-9]\{2\}\$}, trong khi DTO ban đầu chỉ kiểm tra không rỗng.
-Ràng buộc Bean Validation đã được bổ sung vào \texttt{ScanRequest} để đồng bộ implementation với
-hợp đồng. Kết quả này mới xác nhận một lát cắt quan trọng, chưa đủ để kết luận toàn bộ 20 operation
-đều tuân thủ contract. Trước khi chốt báo cáo cần thực hiện các công việc sau:
+Tuy nhiên, trạng thái ``có mã nguồn'' chưa đồng nghĩa với ``đã kiểm chứng''. Tại commit được đối
+chiếu, các thư mục test Java của bốn module chỉ có tệp \texttt{.gitkeep}; script E2E và load test
+chưa được hiện thực. Workflow CI có bước \texttt{mvn -B verify}, lint, test, build frontend và build
+Docker image, nhưng repository không lưu kết quả chạy của workflow. Ngoài ra, DTO
+\texttt{ScanRequest} hiện chỉ ràng buộc \texttt{stationId} không rỗng và giới hạn chuỗi QR tối đa
+1024 ký tự; quy tắc định dạng \texttt{StationId} trong OpenAPI chưa có contract test chứng minh mức
+độ đồng bộ với implementation. Vì vậy, trước khi chốt bằng chứng hiện thực cần thực hiện các công
+việc sau:
 
 \begin{itemize}
-    \item hợp nhất nhánh backend và frontend vào nhánh chính, sau đó chạy toàn bộ pipeline CI;
+    \item chạy toàn bộ pipeline CI trên commit đã hợp nhất và lưu đường dẫn/kết quả làm bằng chứng;
     \item so sánh tài liệu do Springdoc sinh tại \texttt{/v3/api-docs} với bốn tệp OpenAPI chuẩn;
-    \item mở rộng contract test sang các operation còn lại, bổ sung integration test và test cho
-    các mã lỗi quan trọng;
+    \item bổ sung contract test cho các operation cốt lõi, integration test PostgreSQL/SQLite và
+    test cho các mã lỗi quan trọng;
     \item chạy kịch bản demo online/offline, timeout và gửi bù outbox, ghi lại kết quả thực tế;
-    \item bổ sung ảnh chụp các màn hình đã hiện thực và thay các mô tả trạng thái dự kiến bằng bằng
-    chứng từ hệ thống chạy được.
+    \item hiện thực các feature React, bổ sung ảnh chụp màn hình chạy thật và thay các wireframe
+    bằng bằng chứng từ hệ thống khi phù hợp.
 \end{itemize}
