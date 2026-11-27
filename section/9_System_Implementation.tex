@@ -1,445 +1,718 @@
 \section{Hiện thực hệ thống}\label{sec:system-implementation}
 
-Chương này trình bày phạm vi hiện thực của phiên bản MVP, các lựa chọn công nghệ, cách tổ chức mã
-nguồn, hiện thực các chức năng cốt lõi và hợp đồng API giữa các thành phần. Nội dung được đối chiếu
-với cấu trúc kiến trúc ở Chương~\ref{sec:architecture-structure}, các quyết định ADR và đặc tả
-OpenAPI của dự án.
-
-\noindent\textit{Trạng thái hiện thực tại thời điểm đối chiếu:} Nội dung chương được cập nhật theo
-commit \texttt{b8a997c} trên nhánh \texttt{main}, nơi mã nguồn backend của bốn module Maven đã được
-hợp nhất. Việc đối chiếu trong chương này dựa trên mã nguồn, cấu hình, migration và hợp đồng API đã
-commit. Repository hiện chưa có test backend thực thi (các thư mục \texttt{src/test} chỉ chứa tệp
-giữ chỗ); các kịch bản E2E và tải mới dừng ở tài liệu hướng dẫn. Vì vậy báo cáo chưa dùng kết quả
-build, test xuyên suốt, ảnh chụp giao diện hay số liệu đo làm bằng chứng hoàn thành.
+Chương này trình bày chi tiết quá trình hiện thực phiên bản sản phẩm khả dụng tối thiểu (MVP) của hệ
+thống chấm công và kiểm soát ra vào bằng mã QR cho Công ty Cổ phần Sản xuất TMC. Nội dung chương đi
+từ phạm vi hiện thực, lựa chọn công nghệ và mô hình triển khai container hóa, cấu trúc tổ chức mã
+nguồn, thiết kế chi tiết các module cốt lõi, luồng xử lý nghiệp vụ và kiến trúc giao diện người dùng
+(sitemap), đến đặc tả đầy đủ hợp đồng API giữa các thành phần. Mọi chi tiết kỹ thuật được ánh xạ trực
+tiếp từ cấu trúc kiến trúc ở Chương~\ref{sec:architecture-structure}, các quyết định kiến trúc ở
+Chương~\ref{sec:architecture-decisions} và các nguyên lý thiết kế ở
+Chương~\ref{sec:design-principles}.
 
 \subsection{Phạm vi hiện thực hệ thống}\label{sec:implementation-scope}
 
-Phạm vi hiện thực của MVP được giới hạn theo hai quantum đã chọn ở Chương~\ref{sec:architecture-structure}.
-Tại nhà máy, Gate Agent hiện thực G1--G4 và một phần G5: nhận và xác minh QR, áp dụng quy tắc truy
-cập, điều khiển cổng xoay, lưu SQLite, duy trì outbox, đồng bộ dữ liệu tham chiếu và cung cấp danh
-sách lượt quét cần đối soát. Tại trung tâm, modular monolith hiện thực C1, C2, C3 và C7: tiếp nhận sự
-kiện từ gate, quản lý nhân viên và credential QR, theo dõi trạm, đăng nhập và phân quyền. Thư viện
-\texttt{sync-contract} chứa DTO dùng chung giữa hai quantum; \texttt{turnstile-sim} thay thế thiết
-bị vật lý trong môi trường phát triển.
-
-Các chức năng chốt kỳ, tích hợp HR/Payroll, báo cáo nghiệp vụ, audit nâng cao và cấu hình toàn hệ
-thống thuộc C4, C5, C6, C8 và C9 không nằm trong lát cắt MVP. Giao diện React được tổ chức thành hai
-build target cho Gate và Central, nhưng tại thời điểm đối chiếu mới chỉ có entry point và khung
-tích hợp; vì vậy báo cáo chưa coi các màn hình trong sitemap là đã hoàn tất. Tương tự, các kịch bản
-E2E T1--T11 và load test T9 đã có đặc tả nhưng chưa có đủ script và kết quả đo để dùng làm bằng chứng.
-
-Tiêu chí hoàn thành cho phần backend của lát cắt này gồm: build được bốn module Maven, database được
-khởi tạo bằng migration, endpoint cốt lõi khớp hợp đồng OpenAPI, Gate Agent vẫn ra quyết định cục bộ
-khi Central gián đoạn và sự kiện có thể được gửi bù từ outbox. Mã nguồn hiện đã chứa đầy đủ lớp và
-cấu hình cho các tiêu chí trên, nhưng repository chưa kèm kết quả kiểm thử có thể tái lập để xác nhận
-chúng ở runtime. Do đó, trạng thái trong chương được phân biệt rõ giữa ``đã có mã nguồn'' và ``đã
-được kiểm chứng bằng test''.
-
-\subsection{Công nghệ và môi trường phát triển}\label{sec:implementation-technology}
-
-Backend sử dụng Java 21 và Spring Boot 3.5.6, được quản lý bằng một Maven multi-module project.
-Central dùng Spring Modulith 1.4.3 để biểu diễn ranh giới module trong cùng tiến trình; Gate Agent
-dùng Spring JDBC thay vì JPA để kiểm soát rõ các giao dịch SQLite. Các phiên bản dưới đây được lấy
-trực tiếp từ parent POM và tệp cấu hình ứng dụng, thay vì chỉ dựa vào lựa chọn dự kiến trong ADR.
+Phiên bản MVP được cắt lát theo đúng hai architecture quantum đã xác định ở
+Chương~\ref{sec:architecture-structure} nhằm kiểm chứng sớm các đặc tính kiến trúc ưu tiên
+(Performance, Availability và Data Integrity) trên luồng nghiệp vụ quan trọng nhất: cấp phát mã QR
+động và kiểm soát ra vào tại trạm cổng trong cả điều kiện có mạng và mất kết nối WAN.
 
 \begin{table}[H]
 \centering
-\caption{Công nghệ chính của bản hiện thực MVP}
-\label{tab:implementation-technology-stack}
+\caption{Phạm vi các thành phần trong phiên bản MVP và các giai đoạn tiếp theo}
+\label{tab:mvp-implementation-scope}
 \small
-\renewcommand{\arraystretch}{1.2}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Nhóm} & \textbf{Công nghệ/phiên bản} & \textbf{Vai trò trong hệ thống} \\
+\textbf{Thành phần / Phạm vi} & \textbf{Phân loại} & \textbf{Nội dung chức năng} \\
 \hline
-Nền tảng backend & Java 21, Spring Boot 3.5.6 & REST API, validation, security, scheduling, actuator và cấu hình ứng dụng \\
+Gate Agent (Q1: G1--G5) & Trong MVP & Tiếp nhận và xác minh mã QR động (Ed25519), áp dụng quy tắc truy cập (anti-passback, nonce, ngưỡng ngoại tuyến), điều khiển cổng xoay, lưu trữ cục bộ SQLite WAL, duy trì outbox, đồng bộ dữ liệu tham chiếu và cung cấp danh sách lượt quét ở trạng thái \texttt{PENDING} để bảo vệ đối soát. \\
 \hline
-Tổ chức Central & Spring Modulith 1.4.3 & Giữ C1, C2, C3 và C7 thành các module nghiệp vụ có biên rõ trong modular monolith \\
+Central (Q2: C1, C2, C3, C7) & Trong MVP & Tiếp nhận sự kiện đồng bộ từ các Gate Agent theo cơ chế idempotent (C1), quản lý nhân viên và vòng đời credential QR động (C2), theo dõi trạng thái trạm cổng qua heartbeat (C3), xác thực đăng nhập và phân quyền JWT RS256 (C7). \\
 \hline
-Lưu trữ & PostgreSQL 16, SQLite JDBC 3.50.3.0, Flyway & PostgreSQL cho Central; SQLite WAL cho mỗi Gate Agent; migration quản lý lược đồ \\
+Hợp đồng dùng chung & Trong MVP & Thư viện \texttt{sync-contract} đóng gói DTO và hằng số giao tiếp giữa Q1 và Q2; hợp đồng API theo chuẩn OpenAPI 3.0.3 cho bốn nhóm dịch vụ. \\
 \hline
-Khả năng phục hồi & Resilience4j 2.3.0 & Timeout và circuit breaker khi Gate Agent gọi cổng xoay \\
+Bộ giả lập cổng xoay & Trong MVP & Dịch vụ \texttt{turnstile-sim} mô phỏng API phần cứng cổng xoay cho từng nhà máy, hỗ trợ tiêm độ trễ, lỗi và timeout phục vụ trình diễn và kiểm thử khả năng phục hồi. \\
 \hline
-Hợp đồng và tài liệu & OpenAPI 3.0.3, Springdoc 2.8.13 & Đặc tả API chuẩn, Swagger UI và tài liệu runtime tại \texttt{/v3/api-docs} \\
+Giao diện web React & Trong MVP & Ba ứng dụng web độc lập: Kiosk tại trạm cổng (5 màn hình/chế độ K-01--K-05), Portal nhân viên (P-01--P-02) và Admin rút gọn (A-01--A-05) dùng chung luồng xác thực (AU-01--AU-02). \\
 \hline
-Frontend & React 18.3.1, TypeScript 5.6.3, Vite 5.4.10 & Hai build target: Kiosk tại Gate và Portal/Admin tại Central \\
-\hline
-Kiểm thử và đóng gói & JUnit 5, MockMvc, Mockito, JaCoCo 0.8.13, Docker Compose & Các dependency và pipeline đã được khai báo; test thực thi và bằng chứng coverage còn cần bổ sung \\
+Các module mở rộng (C4, C5, C6, C8, C9) & Ngoài MVP & Chốt kỳ và điều chỉnh chấm công (C4), tích hợp HR/Payroll (C5), báo cáo nghiệp vụ và xuất Excel (C6), nhật ký kiểm toán nâng cao (C8), cấu hình toàn hệ thống (C9) và giao diện Guard Console đầy đủ (thay bằng API \texttt{GET /guard/pending}). \\
 \hline
 \end{tabularx}
 \end{table}
 
-Central mặc định chạy ở cổng 8080 và kết nối PostgreSQL; hai Gate Agent demo được ánh xạ ra cổng
-8081 và 8082, mỗi instance có một volume SQLite riêng. Hai simulator chạy ở cổng 9001 và 9002.
-\path{deploy/docker-compose.yml} tách mạng \texttt{wan} khỏi hai mạng LAN nhà máy
-\texttt{lan-bd} và \texttt{lan-la}, nhờ đó script demo có thể ngắt kết nối Gate--Central mà vẫn giữ
-đường truyền từ Gate tới cổng xoay. Các khóa ký, mật khẩu và API key thật được đưa vào qua biến môi
-trường hoặc tệp secret; giá trị mặc định trong repository chỉ phục vụ profile demo.
+Tiêu chí chấp nhận cho phiên bản MVP gồm năm yêu cầu cốt lõi: (1) biên dịch và đóng gói thành công
+bốn module backend và hai mục tiêu giao diện frontend; (2) khởi tạo và quản lý lược đồ cơ sở dữ liệu
+tự động bằng migration; (3) toàn bộ endpoint cốt lõi tuân thủ đặc tả OpenAPI 3.0.3; (4) Gate Agent
+tiếp tục xác thực và mở cổng cục bộ trong thời gian $\leq 2$ giây ngay cả khi mất kết nối WAN tới
+Central; và (5) các giao dịch phát sinh khi ngoại tuyến được gửi bù từ outbox về Central không mất
+mát và không trùng lặp khi kết nối khôi phục.
 
-Môi trường build yêu cầu JDK 21, Maven 3.9+, Node.js 22, npm 10 và Docker Compose v2. Cấu hình thời
-gian của Jackson và Hibernate dùng UTC; Central tắt Open Session in View và chỉ cho Hibernate kiểm
-tra schema, còn Flyway chịu trách nhiệm tạo và nâng cấp database. Gate Agent bật SQLite WAL,
-\texttt{synchronous=FULL}, foreign key và giới hạn HikariCP còn một kết nối để tuần tự hóa thao tác
-ghi, phù hợp với tải đỉnh dự kiến 2--5 lượt quét mỗi giây tại một nhà máy.
+\subsection{Công nghệ, môi trường phát triển và cấu hình triển khai}\label{sec:implementation-technology}
+
+Backend được xây dựng trên nền tảng Java 21 và Spring Boot 3.5.6, tổ chức theo cấu trúc Maven
+multi-module. Ứng dụng Central sử dụng Spring Modulith 1.4.3 để thực thi ranh giới giữa các module
+nghiệp vụ trong cùng tiến trình modular monolith; trong khi đó, Gate Agent sử dụng Spring JDBC trực
+tiếp trên SQLite thay vì JPA nhằm kiểm soát chặt chẽ giao dịch ghi cục bộ và tối ưu độ trễ xử lý tại
+trạm cổng. Bảng~\ref{tab:implementation-technology-stack} tổng hợp các công nghệ chính được sử dụng.
+
+\begin{table}[H]
+\centering
+\caption{Công nghệ và phiên bản sử dụng trong bản hiện thực MVP}
+\label{tab:implementation-technology-stack}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Nhóm} & \textbf{Công nghệ / Phiên bản} & \textbf{Vai trò trong hệ thống} \\
+\hline
+Nền tảng backend & Java 21, Spring Boot 3.5.6 & Xây dựng REST API, Bean Validation, Spring Security, tác vụ nền (scheduling), Actuator và quản lý cấu hình. \\
+\hline
+Tổ chức module Central & Spring Modulith 1.4.3 & Bảo toàn biên giới giữa C1, C2, C3, C7 và quản lý bảng phát hành sự kiện nội bộ (event publication). \\
+\hline
+Lưu trữ và migration & PostgreSQL 16, SQLite JDBC 3.50.3.0, Flyway & PostgreSQL lưu dữ liệu trung tâm; SQLite chế độ WAL lưu cục bộ tại từng Gate Agent; Flyway quản lý phiên bản lược đồ tự động. \\
+\hline
+Khả năng phục hồi & Resilience4j 2.3.0 & Áp dụng timeout (800 ms) và circuit breaker riêng theo từng cổng xoay khi Gate Agent gọi thiết bị. \\
+\hline
+Mật mã và xác thực & Ed25519, JWT RS256, BCrypt & Ký và xác minh mã QR động (Ed25519); xác thực phiên web (JWT RS256, hiệu lực 8 giờ); băm mật khẩu người dùng (BCrypt). \\
+\hline
+Hợp đồng API & OpenAPI 3.0.3, Springdoc 2.8.13 & Đặc tả API chuẩn hóa, sinh kiểu dữ liệu TypeScript và công bố Swagger UI, tài liệu runtime tại \texttt{/v3/api-docs}. \\
+\hline
+Giao diện web & React 18.3.1, TypeScript 5.6.3, Vite 5.4.10 & Xây dựng hai gói giao diện độc lập: Kiosk (phục vụ bởi Gate Agent) và Portal/Admin (phục vụ bởi Central). \\
+\hline
+Kiểm thử và triển khai & JUnit 5, MockMvc, Mockito, Vitest 2.1.4, MSW 2.6.0, k6, Docker Compose v2 & Kiểm thử đơn vị, kiểm thử tích hợp/giao diện, giả lập API khi phát triển, kiểm thử chịu tải và đóng gói hạ tầng đa mạng. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Môi trường phát triển và đóng gói yêu cầu JDK 21, Maven 3.9+, Node.js 22, npm 10 và Docker Compose
+v2. Các cấu hình vận hành quan trọng gồm:
+\begin{itemize}
+    \item \textbf{Chuẩn hóa thời gian:} Jackson và Hibernate đều sử dụng múi giờ UTC (ISO-8601); tầng
+    giao diện chỉ chuyển đổi sang múi giờ \texttt{Asia/Ho\_Chi\_Minh} khi hiển thị cho người dùng.
+    \item \textbf{Quản lý lược đồ dữ liệu:} Central tắt \textit{Open Session in View} và chỉ cho phép
+    Hibernate kiểm tra tính khớp của lược đồ (\texttt{validate}), giao toàn quyền khởi tạo và nâng
+    cấp bảng cho Flyway.
+    \item \textbf{Tối ưu ghi cục bộ tại Gate:} SQLite bật chế độ \texttt{WAL} (\textit{Write-Ahead
+    Logging}), \texttt{synchronous=FULL}, ràng buộc khóa ngoại (\texttt{foreign\_keys=ON}) và giới
+    hạn HikariCP ở đúng một kết nối ghi tuần tự nhằm tránh tranh chấp khóa ghi trong khi vẫn dư sức
+    đáp ứng tải đỉnh 2--5 lượt quét/giây mỗi nhà máy.
+    \item \textbf{Bảo mật cấu hình:} Khóa ký Ed25519, cặp khóa RSA ký JWT, mật khẩu cơ sở dữ liệu và
+    API key giữa các trạm được nạp qua biến môi trường hoặc tệp bí mật (\textit{secrets}), tách biệt
+    khỏi mã nguồn.
+\end{itemize}
+
+Để mô phỏng sát kiến trúc vật lý hai nhà máy (Bình Dương -- \texttt{BD} và Long An -- \texttt{LA})
+và trụ sở trung tâm trong môi trường phát triển, hệ thống sử dụng cấu hình triển khai container hóa
+gồm sáu dịch vụ và ba mạng ảo độc lập như trình bày ở Bảng~\ref{tab:docker-deployment-topology}. Việc
+tách mạng \texttt{wan} khỏi hai mạng nội bộ \texttt{lan-bd} và \texttt{lan-la} cho phép ngắt đường
+truyền từ Gate Agent về Central để kiểm chứng chế độ ngoại tuyến mà vẫn duy trì kết nối giữa Gate
+Agent và cổng xoay trong cùng nhà máy.
+
+\begin{table}[H]
+\centering
+\caption{Cấu hình triển khai container hóa mô phỏng hạ tầng hai nhà máy}
+\label{tab:docker-deployment-topology}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.7cm}|>{\raggedright\arraybackslash}p{1.8cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Container} & \textbf{Cổng} & \textbf{Mạng ảo} & \textbf{Volume} & \textbf{Vai trò} \\
+\hline
+\texttt{postgres} & \texttt{5432} & \texttt{wan} & \texttt{pg-data} & CSDL PostgreSQL 16 của Central, kiểm tra sẵn sàng bằng \texttt{pg\_isready}. \\
+\hline
+\texttt{central} & \texttt{8080} & \texttt{wan} & -- & Ứng dụng Central (C1, C2, C3, C7) đồng thời phục vụ tĩnh \texttt{portal.html} và \texttt{admin.html}. \\
+\hline
+\texttt{gate-bd} & \texttt{8081} & \texttt{wan}, \texttt{lan-bd} & \texttt{gate-bd-data} & Gate Agent nhà máy Bình Dương (trạm \texttt{BD-IN-01}, \texttt{BD-OUT-01}), phục vụ \texttt{kiosk.html}. \\
+\hline
+\texttt{gate-la} & \texttt{8082} & \texttt{wan}, \texttt{lan-la} & \texttt{gate-la-data} & Gate Agent nhà máy Long An (trạm \texttt{LA-IN-01}, \texttt{LA-OUT-01}), phục vụ \texttt{kiosk.html}. \\
+\hline
+\texttt{turnstile-sim-bd} & \texttt{9001} & \texttt{lan-bd} & -- & Giả lập cổng xoay \texttt{TS-BD-IN-01} và \texttt{TS-BD-OUT-01}. \\
+\hline
+\texttt{turnstile-sim-la} & \texttt{9002} & \texttt{lan-la} & -- & Giả lập cổng xoay \texttt{TS-LA-IN-01} và \texttt{TS-LA-OUT-01}. \\
+\hline
+\end{tabularx}
+\end{table}
 
 \subsection{Cấu trúc mã nguồn và tổ chức module}\label{sec:source-organization}
 
-Repository dùng một parent POM khai báo bốn module build: \texttt{sync-contract},
-\texttt{gate-agent}, \texttt{central} và \texttt{simulators/turnstile-sim}. Mã frontend, tài liệu,
-cấu hình triển khai và kiểm thử hệ thống được đặt cạnh các module Java nhưng không tham gia reactor
-Maven. Cách bố trí cấp cao như sau:
+Toàn bộ mã nguồn được quản lý trong một monorepo thống nhất (theo ADR-07) với một parent POM khai
+báo bốn module Maven: \texttt{sync-contract}, \texttt{gate-agent}, \texttt{central} và
+\texttt{simulators/turnstile-sim}. Mã nguồn giao diện web, cấu hình triển khai và bộ kịch bản kiểm
+thử hệ thống được đặt ngang hàng để đồng bộ hóa vòng đời phát triển:
 
 \begin{verbatim}
 tmc/
-|-- sync-contract/              DTO va hang so giao tiep Q1--Q2
-|-- gate-agent/                 G1--G5, SQLite, sync va turnstile adapter
-|-- central/                    C1, C2, C3, C7 trong modular monolith
-|-- simulators/turnstile-sim/   bo gia lap cong xoay
-|-- web/                        React/TypeScript, target gate va central
-|-- docs/                       SRS, OpenAPI, sitemap va wireframe
-|-- deploy/                     Dockerfile, Compose, env va script demo
-`-- tests/                      dac ta E2E va load test
+|-- sync-contract/              DTO va hang so giao tiep giua Q1 va Q2
+|-- gate-agent/                 Component G1--G5, SQLite, sync va turnstile adapter
+|-- central/                    Module C1, C2, C3, C7 trong modular monolith
+|-- simulators/turnstile-sim/   Dich vu gia lap phan cung cong xoay
+|-- web/                        Ung dung React/TypeScript (build target gate va central)
+|-- deploy/                     Dockerfile, cau hinh container, bien moi truong
+`-- tests/                      Kich ban kiem thu E2E (T1--T11) va chiu tai (T9)
 \end{verbatim}
 
-Bên trong Gate Agent, package cấp một bám theo component: \texttt{access}, \texttt{turnstile},
-\texttt{localstore}, \texttt{sync} và \texttt{guard}. Central được chia theo capability
-\texttt{ingestion}, \texttt{employee}, \texttt{station} và \texttt{iam}. Mỗi capability tiếp tục
-tách thành \texttt{api}, \texttt{application}, \texttt{domain} và \texttt{infrastructure}. Tầng
-\texttt{domain} chứa thực thể, value object và port; tầng \texttt{application} điều phối use case;
-\texttt{api} chuyển đổi HTTP hoặc công bố API module; \texttt{infrastructure} hiện thực persistence,
-security và lời gọi ra ngoài. Phụ thuộc được hướng vào domain thông qua interface như
-\texttt{TurnstileGateway}, \texttt{QrTokenSigner}, \texttt{IngestionStore} và
-\texttt{SyncClient}.
+Bên trong mỗi ứng dụng backend, cấu trúc package tuân thủ nguyên tắc phân rã theo miền nghiệp vụ
+(domain partitioning) kết hợp kiến trúc hướng cổng và bộ chuyển đổi (Ports and Adapters):
+\begin{itemize}
+    \item \textbf{Gate Agent} tổ chức năm package cấp một tương ứng năm component: \texttt{access}
+    (G1), \texttt{turnstile} (G2), \texttt{localstore} (G3), \texttt{sync} (G4) và \texttt{guard}
+    (G5).
+    \item \textbf{Central} tổ chức bốn package cấp một tương ứng bốn capability của MVP:
+    \texttt{ingestion} (C1), \texttt{employee} (C2), \texttt{station} (C3) và \texttt{iam} (C7).
+    \item \textbf{Cấu trúc bốn tầng bên trong mỗi module:} \texttt{domain} chứa thực thể, value
+    object, luật nghiệp vụ và các port (interface); \texttt{application} điều phối use case;
+    \texttt{api} chuyển đổi HTTP hoặc công bố giao diện giữa các module; và \texttt{infrastructure}
+    hiện thực persistence (JDBC/JPA), mật mã, bảo mật và lời gọi HTTP ra ngoài. Mọi phụ thuộc đều
+    hướng vào \texttt{domain} thông qua các port như \texttt{TurnstileGateway},
+    \texttt{QrTokenSigner}, \texttt{IngestionStore} và \texttt{SyncClient}.
+\end{itemize}
 
-\texttt{sync-contract} không phụ thuộc vào hai ứng dụng triển khai. Module này đóng gói
-\texttt{EventBatch}, \texttt{BatchAck}, \texttt{SnapshotDelta}, \texttt{Heartbeat}, cấu trúc QR và
-hằng số version/path; cả Gate Agent lẫn Central cùng biên dịch dựa trên một định nghĩa. Migration
-được giữ cùng module sở hữu dữ liệu: Central có các migration riêng cho employee, ingestion,
-station, IAM và event publication; Gate Agent có migration SQLite tạo local store và outbox.
+Thư viện \texttt{sync-contract} không phụ thuộc vào bất kỳ framework triển khai nào; nó định nghĩa
+tập bản ghi (Java records) dùng chung gồm \texttt{EventBatch}, \texttt{BatchAck},
+\texttt{SnapshotDelta}, \texttt{Heartbeat}, cấu trúc payload QR và hằng số phiên bản hợp đồng
+(\texttt{contractVersion = 1}). Cả Gate Agent và Central cùng biên dịch dựa trên một nguồn duy nhất
+này để ngăn chặn sai lệch lược đồ trao đổi. Tệp migration cơ sở dữ liệu được đặt cùng module sở hữu
+dữ liệu tương ứng (PostgreSQL cho các module Central và SQLite cho Gate Agent).
 
-\subsection{Thiết kế chi tiết các module được lựa chọn}\label{sec:selected-module-design}
+\subsection{Thiết kế chi tiết các module cốt lõi}\label{sec:selected-module-design}
 
-Phần này chọn ba lát cắt có ảnh hưởng trực tiếp tới các thuộc tính kiến trúc ưu tiên: xử lý lượt quét
-tại Gate, đồng bộ dữ liệu giữa hai quantum và phát hành QR tại Central. Các mô tả dùng tên lớp thật
-trong mã nguồn để có thể truy vết từ thiết kế tới implementation.
+Phần này đi sâu vào thiết kế lớp và cơ chế phối hợp của ba lát cắt kỹ thuật quyết định trực tiếp đến
+hiệu năng, khả năng chịu lỗi và bảo mật của hệ thống.
 
-\subsubsection{Lát cắt xử lý lượt quét tại Gate}
+\subsubsection{Lát cắt xử lý lượt quét tại Gate Agent}
 
-\texttt{ScanController} nhận \texttt{ScanRequest}, thực hiện Bean Validation rồi tạo
-\texttt{ScanCommand} với thời điểm lấy từ \texttt{Clock}. \texttt{ProcessScanUseCase} là điểm điều
-phối duy nhất của luồng. Use case đọc \texttt{StationConfig}, phân tích và xác minh token qua
-\texttt{QrTokenVerifier}, tra credential và public key, sau đó giao \texttt{ScanContext} cho
-\texttt{AccessRules}. Việc giữ luật trong các lớp domain giúp controller, SQLite và HTTP adapter
-không trở thành nơi chứa quyết định nghiệp vụ.
+\texttt{ScanController} tiếp nhận \texttt{ScanRequest}, thực hiện kiểm tra hình dạng dữ liệu bằng
+Bean Validation rồi chuyển thành \texttt{ScanCommand} kèm dấu thời gian lấy từ \texttt{java.time.Clock}
+(được tiêm phụ thuộc để dễ dàng kiểm thử các kịch bản hết hạn mã QR). \texttt{ProcessScanUseCase} là
+điểm điều phối duy nhất của luồng xử lý:
+\begin{enumerate}
+    \item Đọc cấu hình trạm \texttt{StationConfig} từ bản sao cục bộ và kiểm tra trạng thái hoạt động
+    của trạm (INV-03).
+    \item Phân tích chuỗi QR và xác minh chữ ký Ed25519 thông qua \texttt{QrTokenVerifier} cùng danh
+    sách khóa công khai đang hoạt động.
+    \item Tra cứu thông tin credential cục bộ, kiểm tra ngưỡng thời gian ngoại tuyến và chuyển ngữ
+    cảnh \texttt{ScanContext} cho lớp miền \texttt{AccessRules} đánh giá các luật nghiệp vụ (chống
+    dùng lại nonce, chống quét trùng chiều anti-passback theo INV-04).
+    \item Lưu bản ghi lượt quét ở trạng thái khởi tạo \texttt{PENDING} vào SQLite trước khi phát lệnh
+    mở cổng; sử dụng chính \texttt{eventId} làm \texttt{requestId} gửi sang cổng xoay để bảo đảm tính
+    idempotent.
+    \item Gọi cổng xoay qua port \texttt{TurnstileGateway}, cập nhật kết quả cuối cùng
+    (\texttt{ACCEPTED} hoặc \texttt{GATE\_FAILED}), ghi giao dịch chấm công (nếu mở thành công) và
+    đẩy bản ghi vào bảng outbox trong cùng giao dịch cục bộ.
+\end{enumerate}
 
-Các interface \texttt{ScanAttemptStore}, \texttt{TransactionStore}, \texttt{NonceRegistry} và
-\texttt{TurnstileGateway} là port đi ra. \texttt{SqliteScanStore} hiện thực các port lưu trữ và ghi
-outbox trong local database; \texttt{HttpTurnstileAdapter} hoặc \texttt{FakeTurnstileGateway} hiện
-thực port thiết bị. Lượt quét được ghi ở trạng thái \texttt{PENDING} trước khi gọi cổng và
-\texttt{eventId} đồng thời được dùng làm \texttt{requestId}, nhờ đó phía thiết bị có thể nhận diện
-lệnh trùng. Adapter HTTP dùng timeout và circuit breaker riêng theo cổng; khi phản hồi mở cổng không
-chắc chắn, use case truy vấn trạng thái command một lần trước khi kết luận thất bại.
+Các port đầu ra gồm \texttt{ScanAttemptStore}, \texttt{TransactionStore}, \texttt{NonceRegistry} và
+\texttt{TurnstileGateway}. \texttt{SqliteScanStore} hiện thực các port lưu trữ và outbox;
+\texttt{HttpTurnstileAdapter} hiện thực giao tiếp thiết bị (còn \texttt{FakeTurnstileGateway} được
+dùng trong kiểm thử tự động). \texttt{HttpTurnstileAdapter} cấu hình timeout mở cổng 800 ms và
+circuit breaker riêng cho từng cổng (ngắt mạch 30 giây sau 5 lỗi liên tiếp). Khi lệnh mở cổng bị
+timeout, use case thực hiện một truy vấn đối soát trạng thái lệnh (timeout 200 ms) để phân biệt cổng
+đã mở nhưng phản hồi trễ với cổng thực sự chưa mở trước khi kết luận \texttt{GATE\_FAILED}.
 
-\subsubsection{Lát cắt local store và đồng bộ}
+\subsubsection{Lát cắt lưu trữ cục bộ và đồng bộ hai quantum}
 
-G3 gom các adapter SQLite cho credential, station, scan, outbox và sync state. Outbox record chỉ
-được đánh dấu \texttt{SYNCED} hoặc \texttt{REJECTED} sau khi Central trả acknowledgement. Ở G4,
-\texttt{OutboxPusher}, \texttt{SnapshotPuller}, \texttt{HeartbeatSender} và
-\texttt{NonceJanitor} là bốn tác vụ nền độc lập. \texttt{RestSyncClient} hiện thực
-\texttt{SyncClient}, thêm \texttt{X-Gate-Key} và gọi ba endpoint trong hợp đồng sync. Chu kỳ push,
-pull, heartbeat, batch size và timeout đều nằm trong \texttt{application.yml} để có thể thay đổi theo
-môi trường mà không sửa mã.
+Component G3 gom các adapter SQLite cho credential, cấu hình trạm, lượt quét, giao dịch, nonce,
+outbox và trạng thái đồng bộ. Mỗi bản ghi outbox giữ trạng thái \texttt{PENDING} cho đến khi nhận
+được phản hồi xác nhận (\texttt{BatchAck}) từ Central mới chuyển sang \texttt{SYNCED} hoặc
+\texttt{REJECTED}. Component G4 vận hành bốn tác vụ nền độc lập có chu kỳ cấu hình được:
+\begin{itemize}
+    \item \texttt{OutboxPusher} (mỗi 2 giây khi outbox không rỗng): gom tối đa 200 sự kiện cũ nhất
+    gửi về \texttt{POST /sync/events}.
+    \item \texttt{SnapshotPuller} (mỗi 15 giây, bảo đảm $\leq 60$ giây theo NFR-SEC-06): kéo thay đổi
+    dữ liệu tham chiếu từ \texttt{GET /sync/snapshot?since=<version>} và áp dụng toàn bộ delta trong
+    một giao dịch SQLite duy nhất.
+    \item \texttt{HeartbeatSender} (mỗi 10 giây): gửi tình trạng trực tuyến, độ sâu outbox và sức
+    khỏe từng cổng xoay về \texttt{POST /sync/heartbeat}.
+    \item \texttt{NonceJanitor}: định kỳ dọn các bản ghi nonce đã vượt quá cửa sổ hiệu lực nhằm giữ
+    kích thước cơ sở dữ liệu cục bộ nhỏ gọn.
+\end{itemize}
 
-Tại Central, \texttt{SyncController} lấy danh tính gate đã được \texttt{GateApiKeyFilter} xác thực.
-Controller chuyển từng loại request cho use case nhận batch, lấy snapshot delta hoặc ghi heartbeat.
-Các lớp tương ứng là \texttt{IngestEventBatchUseCase}, \texttt{GetSnapshotDeltaUseCase} và
-\texttt{RecordHeartbeatUseCase}. Adapter JDBC dùng \texttt{eventId} để bảo đảm tiếp nhận lặp an
-toàn. Dữ liệu tham chiếu thay đổi được ghi thành \texttt{RefChange}; Gate kéo delta theo version
-thay vì tải lại toàn bộ snapshot.
+Mọi lời gọi từ G4 đi qua \texttt{RestSyncClient} (hiện thực \texttt{SyncClient}) với timeout kết nối
+2 giây, timeout đọc 5 giây và tự động đính kèm header \texttt{X-Gate-Key}. Tại Central,
+\texttt{GateApiKeyFilter} xác thực khóa trạm và ánh xạ ra danh tính \texttt{gateId} cùng
+\texttt{factoryId} hợp lệ trước khi chuyển vào \texttt{SyncController}. Các use case
+\texttt{IngestEventBatchUseCase}, \texttt{GetSnapshotDeltaUseCase} và
+\texttt{RecordHeartbeatUseCase} xử lý lần lượt ba luồng đồng bộ: tiếp nhận sự kiện lặp an toàn theo
+khóa chính \texttt{eventId} (INV-06), xuất danh sách thay đổi tham chiếu \texttt{RefChange} theo
+version tăng dần, và cập nhật heartbeat mới nhất (bỏ qua gói tin đến trễ có \texttt{sentAt} cũ hơn).
 
-\subsubsection{Lát cắt quản lý nhân viên, QR và IAM}
+\subsubsection{Lát cắt quản lý nhân viên, phát hành QR và IAM}
 
-Trong C2, hai use case cấp và thu hồi quản lý vòng đời credential. Lớp
-\texttt{GenerateQrTokenUseCase} tạo claims ngắn hạn và gọi port \texttt{QrTokenSigner}; adapter
-Ed25519 tạo chuỗi token đã ký. Các repository JPA lưu employee, credential và signing key trong
-PostgreSQL. Sự kiện
-\texttt{QrCredentialChanged} và \texttt{SigningKeyPublished} được công bố để C1 đưa thay đổi vào
-snapshot dành cho Gate.
+Trong module C2 (\texttt{employee}), các use case cấp và thu hồi credential bảo đảm bất biến mỗi nhân
+viên chỉ có tối đa một credential đang hoạt động (INV-01): khi cấp lại, credential cũ tự động bị thu
+hồi với lý do \texttt{REISSUED} trong cùng giao dịch PostgreSQL. Lớp
+\texttt{GenerateQrTokenUseCase} khởi tạo bộ claims ngắn hạn (phiên bản, \texttt{cid}, \texttt{iat},
+\texttt{exp}, \texttt{nonce}, \texttt{kid}) và gọi port \texttt{QrTokenSigner} (hiện thực bằng thuật
+toán Ed25519). Mọi thay đổi về credential hoặc khóa ký đều phát ra sự kiện miền
+\texttt{QrCredentialChanged} và \texttt{SigningKeyPublished} qua Spring Modulith để module C1 ghi nhận
+vào chuỗi thay đổi snapshot cho các Gate Agent.
 
-C7 tách xác minh mật khẩu và phát hành token thành các port \texttt{PasswordVerifier} và
-\texttt{TokenIssuer}, được hiện thực lần lượt bằng BCrypt và JWT RS256. \texttt{SecurityConfig}
-phân biệt ba loại caller: endpoint đăng nhập công khai, API người dùng dùng Bearer JWT và API sync
-dùng gate API key. Cách tách này ngăn client trình duyệt giả danh Gate Agent, đồng thời cho phép thay
-cơ chế xác thực machine-to-machine mà không thay đổi các use case ingestion.
+Trong module C7 (\texttt{iam}), việc kiểm tra mật khẩu và phát hành JWT được trừu tượng hóa qua hai
+port \texttt{PasswordVerifier} (BCrypt) và \texttt{TokenIssuer} (JWT RS256, \texttt{iss=tmc-central},
+hiệu lực 8 giờ). \texttt{SecurityConfig} thiết lập chuỗi bộ lọc tách biệt ba vùng lưu lượng: endpoint
+đăng nhập và tài nguyên tĩnh công khai; API người dùng xác thực bằng Bearer JWT và kiểm tra vai trò
+(\texttt{EMPLOYEE} / \texttt{ADMIN}); và API đồng bộ \texttt{/sync/**} chỉ chấp nhận
+\texttt{X-Gate-Key}. Sự tách biệt này loại trừ hoàn toàn khả năng trình duyệt mạo danh Gate Agent.
 
-\subsection{Hiện thực các chức năng cốt lõi}\label{sec:core-function-implementation}
-
-Phiên bản MVP tập trung hiện thực hai luồng xuyên suốt quan trọng nhất: cấp và sử dụng mã QR động,
-và xử lý lượt quét tại cổng trong cả hai trạng thái có hoặc mất kết nối tới trung tâm. Backend được
-chia thành hai quantum triển khai độc lập. Quantum Gate Agent chứa G1--G5 và sử dụng SQLite để duy
-trì trạng thái cục bộ; quantum Central chứa các module C1, C2, C3 và C7 cần thiết cho luồng MVP,
-đồng thời sử dụng thư viện \texttt{sync-contract} làm hợp đồng dữ liệu chung.
+\subsection{Hiện thực các chức năng cốt lõi và giao diện người dùng}\label{sec:core-function-implementation}
 
 \subsubsection{Xác thực người dùng và phát hành mã QR động}
 
-Module C7 hiện thực xác thực và phân quyền bằng Spring Security. Endpoint
-\texttt{POST /auth/login} tiếp nhận tên đăng nhập và mật khẩu, sau đó trả về JWT có chữ ký RS256.
-Endpoint \texttt{GET /auth/me} cung cấp danh tính hiện tại để giao diện kiểm tra phiên đăng nhập và
-vai trò. Hai vai trò của MVP là \texttt{EMPLOYEE} và \texttt{ADMIN}; quyền truy cập tiếp tục được
-kiểm tra ở backend thay vì chỉ dựa vào việc ẩn hoặc hiện thành phần giao diện.
+Người dùng đăng nhập qua \texttt{POST /auth/login} để nhận JWT RS256 lưu trong
+\texttt{sessionStorage} (tự xóa khi đóng tab, không dùng refresh token để giảm diện tấn công). Khi
+tải trang, giao diện gọi \texttt{GET /auth/me} kiểm tra hiệu lực phiên và vai trò. Nhân viên có vai
+trò \texttt{EMPLOYEE} gọi \texttt{GET /portal/qr-token} (không truyền tham số định danh; máy chủ lấy
+mã nhân viên trực tiếp từ JWT để ngăn xem hộ mã của người khác theo FR-03). Chuỗi mã QR có định dạng
+\texttt{TMC1.<base64url\_payload>.<base64url\_signature>}, hiệu lực 60 giây (chấp nhận lệch đồng hồ
+$\pm 30$ giây tại trạm), được đề nghị làm mới mỗi 30 giây và gắn header
+\texttt{Cache-Control: no-store}.
 
-Sau khi xác thực, nhân viên gọi \texttt{GET /portal/qr-token} để nhận mã QR của chính mình. Mã nhân
-viên được lấy từ JWT, không được truyền từ trình duyệt, nhờ đó người dùng không thể yêu cầu mã của
-người khác bằng cách thay đổi tham số. C2 kiểm tra trạng thái nhân viên và credential trước khi tạo
-token gồm phiên bản, mã credential, thời điểm phát hành, thời điểm hết hạn, nonce và mã định danh
-khóa. Token được ký bằng Ed25519, có thời hạn tối đa 60 giây và được đề nghị làm mới sau 30 giây.
-Phản hồi sử dụng chỉ thị \texttt{Cache-Control: no-store} để hạn chế lưu mã nhạy cảm trong bộ nhớ
-đệm của trình duyệt.
+Quản trị viên (\texttt{ADMIN}) tra cứu danh sách nhân viên qua \texttt{GET /employees} và thực hiện
+cấp mới, cấp lại hoặc thu hồi credential qua \texttt{POST /employees/\{code\}/qr/issue} và
+\texttt{POST /employees/\{code\}/qr/revoke}. Khi thu hồi thành công, Portal của nhân viên nhận mã
+lỗi \texttt{409 CREDENTIAL\_REVOKED} ở lần làm mới tiếp theo, đồng thời các Gate Agent đang trực
+tuyến sẽ cập nhật danh sách từ chối trong vòng tối đa 60 giây. Hình~\ref{fig:ui-login} và
+Hình~\ref{fig:ui-portal-qr-states} minh họa kết quả chạy thực tế của màn hình đăng nhập và hai trạng
+thái mã QR trên Portal nhân viên.
 
-Đối với quản trị viên, C2 cung cấp danh sách nhân viên và hai thao tác cấp hoặc thu hồi credential
-qua \texttt{POST /employees/\{code\}/qr/issue} và
-\texttt{POST /employees/\{code\}/qr/revoke}. Mỗi nhân viên chỉ có tối đa một credential đang hoạt
-động. Khi credential bị thu hồi, thay đổi được đưa vào luồng đồng bộ để Gate Agent nhận được ở lần
-kéo snapshot tiếp theo.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{figures/09_system_implementation/ui_login.png}
+    \caption{Giao diện đăng nhập dùng chung cho Portal và Admin (\texttt{AU-01})}
+    \label{fig:ui-login}
+\end{figure}
 
-\subsubsection{Xử lý lượt quét tại Gate Agent}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/09_system_implementation/ui_portal_qr.png}
+        \caption{Mã QR động của nhân viên \texttt{E0001} (\texttt{P-01})}
+        \label{fig:ui-portal-qr}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/09_system_implementation/ui_portal_revoked.png}
+        \caption{Trạng thái mã QR đã bị thu hồi (\texttt{P-02})}
+        \label{fig:ui-portal-revoked}
+    \end{subfigure}
+    \caption{Kết quả thực thi luồng cấp và thu hồi mã QR động trên Portal nhân viên}
+    \label{fig:ui-portal-qr-states}
+\end{figure}
 
-Kiosk gửi chuỗi QR và mã trạm tới \texttt{POST /scan}. Controller chỉ thực hiện kiểm tra hình dạng
-request và chuyển lệnh cho \texttt{ProcessScanUseCase}; các quy tắc nghiệp vụ được giữ trong miền
-\texttt{access}. Luồng xử lý chính gồm các bước sau:
+\subsubsection{Xử lý lượt quét tại trạm cổng và phân loại kết quả}
 
-\begin{enumerate}
-    \item Tra cấu hình trạm trong snapshot cục bộ và kiểm tra trạm tồn tại, đang hoạt động.
-    \item Phân tích cấu trúc token, kiểm tra chữ ký Ed25519, thời hạn, credential và nonce.
-    \item Áp dụng các quy tắc chống quét lại, anti-passback và chính sách hoạt động khi mất kết nối.
-    \item Ghi nhận lần quét và trạng thái ban đầu vào CSDL cục bộ trước khi gọi thiết bị.
-    \item Gửi lệnh mở cổng qua port \texttt{TurnstileGateway}, cập nhật kết quả và thêm sự kiện vào
-    outbox để đồng bộ về Central.
-\end{enumerate}
+Kiosk gửi mã trạm và chuỗi QR quét được tới \texttt{POST /scan} với timeout phía client là 2000 ms,
+không tự động thử lại (vì nonce có thể đã bị tiêu thụ) và khóa nhập liệu trong khi đang chờ phản hồi
+để tránh quét đúp. Điểm thiết kế quan trọng là mọi kết quả nghiệp vụ đều trả về mã HTTP 200 kèm
+trường \texttt{result} thuộc một trong ba giá trị: \texttt{ACCEPTED} (màn hình xanh -- chỉ hiển thị
+duy nhất cho trạng thái này theo NFR-AVL-03), \texttt{REJECTED} (màn hình đỏ kèm lý do cụ thể) hoặc
+\texttt{GATE\_FAILED} (màn hình cam yêu cầu gặp bảo vệ). Bảng~\ref{tab:scan-reject-reasons} liệt kê
+đầy đủ các mã kết quả, lý do từ chối và thông báo tiếng Việt chuẩn hóa giữa Gate Agent và Kiosk.
 
-API phân biệt ba kết quả nghiệp vụ: \texttt{ACCEPTED}, \texttt{REJECTED} và
-\texttt{GATE\_FAILED}. Cả ba trường hợp đều trả HTTP 200 vì request đã được xử lý thành công ở mức
-giao thức; trường \texttt{result} và \texttt{reason} mới quyết định thông báo nghiệp vụ trên kiosk.
-Thiết kế này giúp frontend không nhầm một lượt quét bị từ chối với lỗi kết nối hoặc lỗi máy chủ.
-
-\subsubsection{Lưu trữ cục bộ và đồng bộ khi ngoại tuyến}
-
-G3 sử dụng SQLite để lưu cấu hình trạm, credential, khóa công khai, nonce đã sử dụng, lần quét và
-outbox. Việc lưu cục bộ cho phép luồng kiểm soát ra vào tiếp tục hoạt động khi đường truyền WAN tới
-Central bị gián đoạn. Các sự kiện chưa gửi vẫn nằm trong outbox và được G4 gửi bù khi kết nối được
-khôi phục.
-
-G4 trao đổi với C1 qua ba endpoint. \texttt{POST /sync/events} đẩy một lô sự kiện và xử lý lặp an
-toàn theo \texttt{eventId}; \texttt{GET /sync/snapshot} kéo phần thay đổi của credential, khóa công
-khai và cấu hình trạm kể từ phiên bản đã biết; \texttt{POST /sync/heartbeat} gửi trạng thái Gate
-Agent, số lượng bản ghi trong outbox và tình trạng cổng xoay. Các lời gọi này sử dụng
-\texttt{X-Gate-Key}; Central suy ra danh tính và nhà máy từ khóa đã đăng ký thay vì tin dữ liệu định
-danh do client tự khai báo.
-
-Khi offline, chiều ra tiếp tục được xử lý để tránh giữ người trong nhà máy. Chiều vào có thể bị từ
-chối sau khi vượt ngưỡng mất kết nối cấu hình nhằm giảm rủi ro sử dụng credential đã bị thu hồi nhưng
-Gate Agent chưa nhận được. Trạng thái online, độ sâu outbox và việc vượt ngưỡng được công bố qua
-\texttt{GET /status} để kiosk hiển thị cảnh báo vận hành.
-
-\subsubsection{Tích hợp và giả lập cổng xoay}
-
-G2 đóng vai trò adapter giữa nghiệp vụ truy cập và API của nhà cung cấp cổng xoay. Mỗi lệnh mở cổng
-sử dụng \texttt{requestId} chính là mã sự kiện của lượt quét, cho phép thao tác có tính idempotent.
-Nếu lời gọi mở cổng hết thời gian chờ, adapter có thể truy vấn
-\texttt{GET /turnstiles/\{id\}/commands/\{requestId\}} để phân biệt trường hợp thiết bị chưa thực
-thi với trường hợp đã mở cổng nhưng phản hồi bị trễ.
-
-Do không phụ thuộc vào thiết bị vật lý trong giai đoạn phát triển, dự án xây dựng
-\texttt{turnstile-sim}. Bộ giả lập hỗ trợ trạng thái bình thường, lỗi, timeout và trường hợp đã thực
-thi nhưng phản hồi trễ. Endpoint \texttt{GET/PUT /admin/behavior} cho phép thay đổi độ trễ, xác suất
-lỗi và chế độ hoạt động, phục vụ trình diễn các kịch bản khả dụng và khả năng phục hồi.
-
-\subsubsection{Liên kết với sitemap và giao diện người dùng}
-
-Sitemap của MVP đặc tả ba entry point React: Kiosk, Portal và Admin. Tổng cộng có 13 màn hình,
-trạng thái hoặc thành phần tương tác, từ K-01 đến K-05, AU-01 đến AU-02, P-01 đến P-02 và A-01 đến
-A-04. Mỗi mục trong sitemap được ánh xạ tới endpoint, yêu cầu chức năng và tài liệu wireframe tương
-ứng. Cách tổ chức này cho phép frontend phát triển dựa trên contract trước khi backend được tích hợp.
-
-\begin{table}[H]
-\centering
-\caption{Trạng thái hiện thực các nhóm chức năng tại thời điểm đối chiếu}
-\label{tab:implementation-draft-status}
 \small
-\renewcommand{\arraystretch}{1.25}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}X|}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.1cm}|>{\raggedright\arraybackslash}p{4.3cm}|>{\raggedright\arraybackslash}p{4.8cm}|>{\raggedright\arraybackslash}p{3.6cm}|}
+\caption{Bảng mã kết quả quét, lý do từ chối và thông báo hiển thị trên Kiosk}\label{tab:scan-reject-reasons}\\
 \hline
-\textbf{Nhóm} & \textbf{Trạng thái} & \textbf{Bằng chứng hiện có} \\
-\hline
-Gate Agent G1--G5 & Đã hợp nhất trên \texttt{main} & Controller, use case, domain model, adapter cổng xoay, SQLite store, outbox và bốn tác vụ đồng bộ nền \\
-\hline
-Central C1, C2, C3, C7 & Đã hợp nhất trên \texttt{main} & Ingestion, employee/QR, station, IAM/JWT, Spring Modulith event publication và migration dữ liệu \\
-\hline
-Hợp đồng API & Đã đặc tả & Bốn tài liệu OpenAPI 3.0.3 và bản mô tả Markdown tương ứng \\
-\hline
-Sitemap và wireframe & Đã thiết kế & 13 đặc tả màn hình/trạng thái, sơ đồ điều hướng và ánh xạ API \\
-\hline
-Frontend React & Chưa hoàn tất & Các entry point đã có nhưng feature UI vẫn cần hiện thực \\
-\hline
-Kiểm thử và đo đạc & Chưa có bằng chứng thực thi trong repository & CI đã khai báo lệnh \texttt{mvn -B verify}, nhưng hiện chưa có test backend; E2E/load test mới có README và thư mục giữ chỗ \\
-\hline
-\end{tabularx}
-\end{table}
-
-\subsection{Thiết kế và hiện thực API}\label{sec:api-design-implementation}
-
-\subsubsection{Phương pháp contract-first}
-
-API được thiết kế theo hướng contract-first. Mỗi nhóm API có một tài liệu mô tả cho thành viên dự án
-và một tệp OpenAPI 3.0.3 làm nguồn chuẩn cho công cụ. OpenAPI định nghĩa path, method, schema, trường
-bắt buộc, enum, mã lỗi và ví dụ dữ liệu; frontend có thể sinh kiểu TypeScript và mock từ contract,
-trong khi backend phải công bố tài liệu tương đương tại \texttt{/v3/api-docs}. Nếu tài liệu Markdown
-và OpenAPI khác nhau, tệp OpenAPI được xem là nguồn có thẩm quyền và hai bản phải được sửa trong cùng
-một thay đổi.
-
-Hợp đồng hiện tại gồm 19 path và 20 operation, chia thành bốn nhóm ở
-Bảng~\ref{tab:api-contract-groups}. Việc tách riêng API người dùng và API đồng bộ giúp áp dụng hai
-cơ chế xác thực khác nhau, đồng thời giữ ranh giới giữa lưu lượng trình duyệt và lưu lượng
-machine-to-machine.
-
-\begin{table}[H]
-\centering
-\caption{Các nhóm hợp đồng API của MVP}
-\label{tab:api-contract-groups}
-\small
-\renewcommand{\arraystretch}{1.25}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{2.7cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}X|}
-\hline
-\textbf{Nhóm API} & \textbf{Server mặc định} & \textbf{Consumer} & \textbf{Mục đích} \\
-\hline
-Gate Agent & \texttt{:8081}, \texttt{:8082} & Kiosk, guard, demo & Nhận lượt quét, công bố trạng thái cổng, đối soát lượt pending và giả lập offline \\
-\hline
-Central & \texttt{:8080} & Portal, Admin & Đăng nhập, cấp QR động, quản lý credential và theo dõi trạm \\
-\hline
-Sync & \texttt{:8080/sync} & Gate Agent G4 & Đẩy sự kiện, kéo snapshot và gửi heartbeat \\
-\hline
-Turnstile Simulator & \texttt{:9001}, \texttt{:9002} & Gate Agent G2, test/demo & Giả lập API thiết bị và điều khiển hành vi lỗi \\
-\hline
-\end{tabularx}
-\end{table}
-
-\subsubsection{Danh mục endpoint}
-
-\begin{longtable}{|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{2.0cm}|>{\raggedright\arraybackslash}p{5.4cm}|>{\raggedright\arraybackslash}p{5.6cm}|}
-\caption{Danh mục API cốt lõi của MVP}\label{tab:mvp-api-index}\\
-\hline
-\textbf{Nhóm} & \textbf{Method} & \textbf{Path} & \textbf{Chức năng} \\
+\textbf{Result} & \textbf{Mã \texttt{reason}} & \textbf{Ý nghĩa kỹ thuật} & \textbf{Thông báo Kiosk (Màu)} \\
 \hline
 \endfirsthead
 \hline
-\textbf{Nhóm} & \textbf{Method} & \textbf{Path} & \textbf{Chức năng} \\
+\textbf{Result} & \textbf{Mã \texttt{reason}} & \textbf{Ý nghĩa kỹ thuật} & \textbf{Thông báo Kiosk (Màu)} \\
 \hline
 \endhead
 \hline
+\multicolumn{4}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
 \endfoot
+\hline
 \endlastfoot
-Gate Agent & POST & \texttt{/scan} & Kiểm tra QR, ghi nhận lượt quét và yêu cầu mở cổng \\
+\texttt{ACCEPTED} & \textit{(không có)} & Cổng xoay đã xác nhận mở và giao dịch chấm công đã được lưu cục bộ & Mời qua -- \{mã NV\} (VÀO/RA) \textit{(Xanh)} \\
 \hline
-Gate Agent & GET & \texttt{/status} & Trạng thái online, outbox và cổng xoay \\
+\texttt{REJECTED} & \texttt{EXPIRED}, \texttt{NOT\_YET\_VALID} & Token ngoài cửa sổ hiệu lực 60 giây ($\pm 30$ giây lệch đồng hồ) & Mã QR đã hết hạn, vui lòng làm mới \textit{(Đỏ)} \\
 \hline
-Gate Agent & GET & \texttt{/guard/pending} & Các lượt còn ở trạng thái pending sau khi khởi động lại \\
+\texttt{REJECTED} & \texttt{NONCE\_REUSED} & Token đã được sử dụng trước đó (chống chụp màn hình dùng lại) & Mã QR đã được sử dụng \textit{(Đỏ)} \\
 \hline
-Gate Agent & POST & \texttt{/admin/simulate-offline} & Bật hoặc tắt mất kết nối giả lập trong profile demo \\
+\texttt{REJECTED} & \texttt{INVALID\_FORMAT}, \texttt{UNKNOWN\_KEY}, \texttt{BAD\_SIGNATURE} & Chuỗi không đúng định dạng \texttt{TMC1.}, khóa không tồn tại hoặc chữ ký sai & Mã QR không hợp lệ \textit{(Đỏ)} \\
 \hline
-Central & POST & \texttt{/auth/login} & Xác thực và phát hành JWT \\
+\texttt{REJECTED} & \texttt{CREDENTIAL\_REVOKED}, \texttt{CREDENTIAL\_NOT\_FOUND} & Credential đã bị thu hồi hoặc chưa có trong bản sao cục bộ & Mã QR đã bị thu hồi hoặc không tồn tại \textit{(Đỏ)} \\
 \hline
-Central & GET & \texttt{/auth/me} & Trả về người dùng và vai trò hiện tại \\
+\texttt{REJECTED} & \texttt{EMPLOYEE\_INACTIVE} & Hồ sơ nhân viên không còn hoạt động & Nhân viên không còn hiệu lực \textit{(Đỏ)} \\
 \hline
-Central & GET & \texttt{/portal/qr-token} & Phát hành QR động cho nhân viên hiện tại \\
+\texttt{REJECTED} & \texttt{UNKNOWN\_STATION}, \texttt{STATION\_DISABLED} & Trạm không thuộc Gate Agent này hoặc đang bị vô hiệu hóa (INV-03) & Trạm đang tạm ngừng \textit{(Đỏ)} \\
 \hline
-Central & GET & \texttt{/employees} & Tra cứu và lọc danh sách nhân viên \\
+\texttt{REJECTED} & \texttt{ANTI\_PASSBACK} & Quét trùng chiều vào liên tiếp (vi phạm INV-04) & Bạn đã quét vào trước đó \textit{(Đỏ)} \\
 \hline
-Central & POST & \texttt{/employees/\{code\}/qr/issue} & Cấp hoặc cấp lại credential QR \\
+\texttt{REJECTED} & \texttt{OFFLINE\_THRESHOLD\_EXCEEDED} & Cổng chiều vào bị từ chối do mất kết nối WAN vượt ngưỡng cho phép & Mất kết nối quá lâu -- vui lòng gặp bảo vệ \textit{(Đỏ)} \\
 \hline
-Central & POST & \path{/employees/{code}/qr/revoke} & Thu hồi credential QR \\
+\texttt{GATE\_FAILED} & \texttt{GATE\_TIMEOUT}, \texttt{GATE\_ERROR}, \texttt{CIRCUIT\_OPEN} & Luật hợp lệ nhưng cổng xoay quá 800 ms, báo lỗi hoặc đang ngắt mạch 30 giây & Cổng chưa mở -- vui lòng gặp bảo vệ \textit{(Cam)} \\
 \hline
-Central & GET & \texttt{/stations} & Danh sách trạm và trạng thái Gate Agent \\
-\hline
-Sync & POST & \texttt{/sync/events} & Gửi lô sự kiện theo cơ chế idempotent \\
-\hline
-Sync & GET & \texttt{/sync/snapshot} & Lấy thay đổi dữ liệu tham chiếu kể từ version đã biết \\
-\hline
-Sync & POST & \texttt{/sync/heartbeat} & Cập nhật trạng thái Gate Agent \\
-\hline
-Simulator & POST & \texttt{/turnstiles/\{id\}/open} & Mở cổng một lần theo \texttt{requestId} \\
-\hline
-Simulator & GET & \path{/turnstiles/{id}/commands/{requestId}} & Kiểm tra lệnh đã được thực thi hay chưa \\
-\hline
-Simulator & GET & \texttt{/turnstiles/\{id\}/status} & Trạng thái một cổng xoay \\
-\hline
-Simulator & GET & \texttt{/turnstiles} & Danh sách các cổng xoay đã được tạo \\
-\hline
-Simulator & GET, PUT & \texttt{/admin/behavior} & Đọc hoặc thay đổi hành vi giả lập \\
+\textit{Lỗi kết nối / HTTP 5xx} & \textit{(timeout client $> 2$ s)} & Không nhận được phản hồi xác định từ Gate Agent & Không xác định -- vui lòng gặp bảo vệ \textit{(Cam)} \\
 \hline
 \end{longtable}
+\normalsize
 
-\subsubsection{Quy ước dữ liệu và xử lý lỗi}
+Hình~\ref{fig:ui-kiosk-scan-results} minh họa hai kết quả thực thi thực tế tại trạm \texttt{BD-IN-01}:
+lượt quét hợp lệ của nhân viên \texttt{E0001} được chấp nhận và mở cổng trong \textbf{0,37 giây}
+(đáp ứng NFR-PER-01 $\leq 2$ giây), và lượt quét vào lặp lại ngay sau đó bị từ chối với lỗi chống
+quét trùng làn (\texttt{ANTI\_PASSBACK}, INV-04) trong \textbf{0,01 giây}.
 
-Request và response thành công sử dụng JSON với tên trường theo \texttt{camelCase}; thời điểm dùng
-ISO-8601 UTC, enum dùng chữ hoa và dấu gạch dưới. Các trường không có giá trị được lược bỏ thay vì trả
-\texttt{null}. Client phải bỏ qua trường response chưa biết để việc bổ sung trường tùy chọn không phá
-vỡ tương thích ngược.
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/09_system_implementation/ui_kiosk_accepted.png}
+        \caption{Chấp nhận và mở cổng (\texttt{ACCEPTED}, 0,37 s)}
+        \label{fig:ui-kiosk-accepted}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/09_system_implementation/ui_kiosk_rejected.png}
+        \caption{Từ chối trùng làn (\texttt{ANTI\_PASSBACK}, 0,01 s)}
+        \label{fig:ui-kiosk-rejected}
+    \end{subfigure}
+    \caption{Kết quả hiển thị màn hình phủ \texttt{K-02} tại trạm cổng \texttt{BD-IN-01}}
+    \label{fig:ui-kiosk-scan-results}
+\end{figure}
 
-Lỗi giao thức sử dụng Problem Details với media type
-\texttt{application/problem+json}. Ngoài \texttt{status}, \texttt{title} và \texttt{detail}, phản
-hồi có trường \texttt{code} ổn định để client xử lý theo nhánh. Ví dụ, frontend phản ứng với
-\texttt{UNAUTHENTICATED}, \texttt{FORBIDDEN}, \texttt{NO\_ACTIVE\_CREDENTIAL} hoặc
-\texttt{CREDENTIAL\_REVOKED} thay vì so sánh chuỗi mô tả có thể thay đổi. Riêng kết quả quét bị từ
-chối vẫn là phản hồi HTTP 200 như đã trình bày ở Mục~\ref{sec:core-function-implementation}.
+\subsubsection{Lưu trữ cục bộ, hoạt động ngoại tuyến và giả lập cổng xoay}
 
-\subsubsection{Xác thực và phân quyền API}
+Khi kết nối WAN tới Central bị gián đoạn (không có trao đổi thành công trong 30 giây), Gate Agent
+chuyển sang trạng thái ngoại tuyến: mọi lượt quét tiếp tục được xác thực bằng dữ liệu tham chiếu
+trong SQLite và lưu vào outbox để gửi bù khi có mạng. Nhằm cân bằng giữa tính sẵn sàng và bảo mật,
+chiều \texttt{OUT} luôn tiếp tục hoạt động để không giữ nhân viên trong nhà máy, còn chiều
+\texttt{IN} sẽ bị từ chối với lý do \texttt{OFFLINE\_THRESHOLD\_EXCEEDED} nếu thời gian mất kết nối
+vượt ngưỡng cấu hình (mặc định 8 giờ trong vận hành và 2 phút trong cấu hình trình diễn). Kiosk định
+kỳ gọi \texttt{GET /status} mỗi 3 giây để hiển thị biểu ngữ cảnh báo \textit{``OFFLINE -- \{n\} bản
+ghi chờ đồng bộ''} và thông báo tạm ngừng chiều vào khi vượt ngưỡng.
 
-Central sử dụng JWT cho API người dùng. \texttt{/auth/login} là endpoint công khai;
-\texttt{/auth/me} chấp nhận mọi người dùng đã đăng nhập; \texttt{/portal/**} yêu cầu vai trò
-\texttt{EMPLOYEE}; các endpoint quản lý nhân viên và trạm yêu cầu \texttt{ADMIN}. API
-\texttt{/sync/**} không sử dụng JWT của người dùng mà yêu cầu \texttt{X-Gate-Key}, vì consumer là
-Gate Agent chứ không phải trình duyệt.
-
-Các endpoint kiosk và simulator không yêu cầu tài khoản trong MVP vì chỉ được đặt trong mạng LAN nhà
-máy cô lập. Endpoint thay đổi trạng thái offline chỉ được đăng ký khi bật cấu hình fault injection
-của profile demo. Các giá trị nhạy cảm như chuỗi QR thô, JWT, mật khẩu và gate key không được ghi vào
-log.
-
-\subsubsection{Ánh xạ sitemap tới API}
-
-Sitemap không chỉ mô tả điều hướng mà còn là tài liệu tích hợp frontend--backend. Kiosk gọi
-\texttt{GET /status} mỗi 3 giây và gửi \texttt{POST /scan} với timeout 2 giây; Portal kiểm tra
-\texttt{/auth/me}, lấy QR mới mỗi 30 giây và xử lý trạng thái 409; Admin tải danh sách nhân viên,
-thực hiện cấp/thu hồi credential và làm mới danh sách trạm mỗi 5 giây. Bảng ánh xạ này giúp truy vết
-từ màn hình, thao tác người dùng, endpoint, controller tới yêu cầu chức năng liên quan.
-
-\subsubsection{Mức độ hoàn thiện và nội dung cần bổ sung}
-
-Các controller tương ứng với các endpoint cốt lõi đã được hợp nhất trên \texttt{main}, gồm
-\texttt{AuthController}, \texttt{QrTokenController}, \texttt{EmployeeController},
-\texttt{StationController}, \texttt{SyncController}, \texttt{ScanController},
-\texttt{StatusController}, \texttt{PendingReconcileController},
-\texttt{FaultInjectionController} và các controller của simulator. Bốn tệp OpenAPI hiện mô tả 19
-path và 20 operation; số lượng này khớp với danh mục ở Bảng~\ref{tab:mvp-api-index}. Ở mức mã nguồn,
-các endpoint đã nối tới use case tương ứng, hai security filter chain đã tách lưu lượng người dùng
-và lưu lượng sync, còn Gate Agent đã có migration SQLite cùng các scheduler push, pull, heartbeat
-và dọn nonce.
-
-Tuy nhiên, trạng thái ``có mã nguồn'' chưa đồng nghĩa với ``đã kiểm chứng''. Tại commit được đối
-chiếu, các thư mục test Java của bốn module chỉ có tệp \texttt{.gitkeep}; script E2E và load test
-chưa được hiện thực. Workflow CI có bước \texttt{mvn -B verify}, lint, test, build frontend và build
-Docker image, nhưng repository không lưu kết quả chạy của workflow. Ngoài ra, DTO
-\texttt{ScanRequest} hiện chỉ ràng buộc \texttt{stationId} không rỗng và giới hạn chuỗi QR tối đa
-1024 ký tự; quy tắc định dạng \texttt{StationId} trong OpenAPI chưa có contract test chứng minh mức
-độ đồng bộ với implementation. Vì vậy, trước khi chốt bằng chứng hiện thực cần thực hiện các công
-việc sau:
-
+Ở phía thiết bị, dịch vụ \texttt{turnstile-sim} mô phỏng chính xác API nhà cung cấp cổng xoay với
+bốn chế độ điều khiển động qua \texttt{PUT /admin/behavior}:
 \begin{itemize}
-    \item chạy toàn bộ pipeline CI trên commit đã hợp nhất và lưu đường dẫn/kết quả làm bằng chứng;
-    \item so sánh tài liệu do Springdoc sinh tại \texttt{/v3/api-docs} với bốn tệp OpenAPI chuẩn;
-    \item bổ sung contract test cho các operation cốt lõi, integration test PostgreSQL/SQLite và
-    test cho các mã lỗi quan trọng;
-    \item chạy kịch bản demo online/offline, timeout và gửi bù outbox, ghi lại kết quả thực tế;
-    \item hiện thực các feature React, bổ sung ảnh chụp màn hình chạy thật và thay các wireframe
-    bằng bằng chứng từ hệ thống khi phù hợp.
+    \item \texttt{NORMAL}: mở cổng sau độ trễ ngẫu nhiên trong khoảng \texttt{latencyMs} (mặc định
+    300--500 ms) và có thể phát sinh lỗi HTTP 500 theo xác suất \texttt{failureRate}.
+    \item \texttt{TIMEOUT}: không mở cổng và trì hoãn 5 giây trước khi trả HTTP 504 (kích hoạt
+    timeout 800 ms của Gate Agent).
+    \item \texttt{ERROR}: không mở cổng và trả ngay HTTP 500 (\texttt{SIMULATED\_ERROR}).
+    \item \texttt{EXECUTE\_THEN\_TIMEOUT}: vẫn thực thi mở cổng nhưng trì hoãn phản hồi 5 giây, dùng
+    để kiểm chứng cơ chế truy vấn đối soát lệnh \texttt{GET /turnstiles/\{id\}/commands/\{requestId\}}
+    của Gate Agent.
 \end{itemize}
+
+Hình~\ref{fig:ui-kiosk-outbox-sync} minh họa màn hình chờ quét làn vào (\texttt{K-01}) kết hợp bảng
+điều khiển demo (\texttt{K-05}) khi Gate Agent đang đẩy bù các bản ghi còn tồn trong hàng đợi outbox
+về Central sau khi khôi phục kết nối.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{figures/09_system_implementation/ui_kiosk_offline.png}
+    \caption{Màn hình Kiosk làn vào (\texttt{K-01}) kèm bảng điều khiển demo (\texttt{K-05}) hiển thị hàng đợi outbox đang đồng bộ bù}
+    \label{fig:ui-kiosk-outbox-sync}
+\end{figure}
+
+\subsubsection{Kiến trúc giao diện web và danh mục màn hình (Sitemap)}
+
+Giao diện web được xây dựng bằng React và TypeScript, tách thành hai gói biên dịch độc lập: gói
+\texttt{gate} (chỉ chứa trang \texttt{kiosk.html}, nhúng trực tiếp vào Gate Agent) và gói
+\texttt{central} (chứa hai trang \texttt{portal.html} và \texttt{admin.html}, nhúng trực tiếp vào
+Central). Cách đóng gói cùng nguồn gốc (same-origin) loại bỏ nhu cầu cấu hình CORS. Riêng trang
+\texttt{admin.html} sử dụng định tuyến dạng hash (\texttt{\#/employees}, \texttt{\#/stations}) để
+máy chủ tĩnh phục vụ trực tiếp mà không cần luật fallback SPA.
+
+Về cấu trúc mã nguồn frontend, các thành phần được chia thành bốn lớp rõ ràng: lớp khởi tạo trang
+(\texttt{entries}), lớp tính năng theo nghiệp vụ (\texttt{features/kiosk}, \texttt{features/portal},
+\texttt{features/admin}, \texttt{features/auth}), lớp giao tiếp API dùng chung
+(\texttt{shared/api/gateApi}, \texttt{shared/api/centralApi}, \texttt{shared/api/authSession} -- là
+nơi duy nhất được phép gọi HTTP, sử dụng kiểu TypeScript sinh tự động từ OpenAPI 3.0.3) và lớp thành
+phần hiển thị/hook dùng chung (\texttt{shared/ui}, \texttt{shared/hooks}).
+
+Toàn bộ sitemap của phiên bản MVP gồm 14 màn hình, trạng thái và thành phần tương tác được đặc tả đầy
+đủ trong Bảng~\ref{tab:web-sitemap-catalog}.
+
+\small
+\begin{longtable}{|>{\raggedright\arraybackslash}p{1.2cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{5.6cm}|}
+\caption{Danh mục đầy đủ 14 màn hình và trạng thái giao diện web của MVP}\label{tab:web-sitemap-catalog}\\
+\hline
+\textbf{Mã} & \textbf{Tên màn hình} & \textbf{Trang / Loại} & \textbf{API sử dụng} & \textbf{Chức năng và hành vi chính} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Tên màn hình} & \textbf{Trang / Loại} & \textbf{API sử dụng} & \textbf{Chức năng và hành vi chính} \\
+\hline
+\endhead
+\hline
+\multicolumn{5}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
+\endfoot
+\hline
+\endlastfoot
+\texttt{K-01} & Chờ quét & \texttt{kiosk.html} \textit{(screen)} & \texttt{GET /status}, \texttt{POST /scan} & Màn hình chính tại trạm cổng (\texttt{?station=<id>}); giữ tiêu điểm (focus) trên ô nhập ẩn để nhận chuỗi từ máy quét USB; hiển thị biểu ngữ trạng thái mạng và độ sâu outbox mỗi 3 giây. \\
+\hline
+\texttt{K-02} & Kết quả quét & Phủ lên \texttt{K-01} \textit{(overlay)} & Kết quả \texttt{POST /scan} & Hiển thị nền xanh (\texttt{ACCEPTED}), đỏ (\texttt{REJECTED}) hoặc cam (\texttt{GATE\_FAILED}) kèm mã nhân viên, chiều vào/ra, thời gian xử lý (\texttt{elapsedMs}); tự đóng về \texttt{K-01} sau 3 giây. \\
+\hline
+\texttt{K-03} & Lỗi cấu hình trạm & \texttt{kiosk.html} \textit{(screen)} & \texttt{GET /status} & Hiển thị cho kỹ thuật viên khi thiếu tham số \texttt{station} hoặc mã trạm không thuộc danh sách trạm của Gate Agent. \\
+\hline
+\texttt{K-04} & Quét bằng webcam & \texttt{?camera=1} \textit{(mode)} & \texttt{POST /scan} & Bổ sung khung camera trực tiếp trên \texttt{K-01} để giải mã QR bằng webcam khi không có đầu đọc USB. \\
+\hline
+\texttt{K-05} & Bảng điều khiển demo & \texttt{?demo=1} \textit{(panel)} & \texttt{POST} \path{/admin/simulate-offline}, \texttt{GET /status} & Bảng bật/tắt giả lập mất kết nối WAN và theo dõi thông số outbox trực tiếp trên kiosk trong cấu hình demo. \\
+\hline
+\texttt{AU-01} & Đăng nhập & \texttt{portal.html}, \texttt{admin.html} \textit{(screen)} & \texttt{POST /auth/login}, \texttt{GET /auth/me} & Biểu mẫu nhập tài khoản/mật khẩu dùng chung cho Portal và Admin; khóa nút gửi khi đang xử lý; lưu JWT vào \texttt{sessionStorage}. \\
+\hline
+\texttt{AU-02} & Không có quyền truy cập & \texttt{portal.html}, \texttt{admin.html} \textit{(screen)} & \texttt{GET /auth/me} & Hiển thị khi tài khoản đã đăng nhập hợp lệ nhưng sai vai trò trang (ví dụ \texttt{ADMIN} mở Portal hoặc \texttt{EMPLOYEE} mở Admin), kèm nút đăng xuất. \\
+\hline
+\texttt{P-01} & Mã QR cá nhân & \texttt{portal.html} \textit{(screen)} & \texttt{GET} \path{/portal/qr-token} & Hiển thị mã QR động (mức sửa lỗi M) kèm đồng hồ đếm ngược 60 giây (tự động bù lệch đồng hồ máy chủ qua header \texttt{Date}); làm mới mỗi 30 giây và khi mở lại tab; có nút sao chép chuỗi QR. \\
+\hline
+\texttt{P-02} & Không có mã QR & \texttt{portal.html} \textit{(state)} & \texttt{GET} \path{/portal/qr-token} (409) & Thay thế \texttt{P-01} khi mã đã bị thu hồi, chưa được cấp hoặc nhân viên ngừng hoạt động; tự động hỏi lại mỗi 30 giây để hiển thị ngay khi HR cấp lại. \\
+\hline
+\texttt{A-01} & Khung trang quản trị & \texttt{admin.html} \textit{(layout)} & \texttt{GET /auth/me} & Thanh điều hướng chứa tên tài khoản, nút đăng xuất và hai tab chuyển đổi giữa \texttt{A-02} (\texttt{\#/employees}) và \texttt{A-04} (\texttt{\#/stations}). \\
+\hline
+\texttt{A-02} & Tab Nhân viên & \texttt{\#/employees} \textit{(tab)} & \texttt{GET /employees} & Bảng danh sách nhân viên kèm trạng thái credential; hỗ trợ lọc theo phòng ban, tìm kiếm theo mã/tên (debounce 300 ms), chọn từng dòng hoặc nhiều dòng. \\
+\hline
+\texttt{A-03} & Hộp thoại thao tác QR & Dialog trên \texttt{A-02} & \texttt{POST} \path{.../qr/revoke}, \texttt{POST} \path{.../qr/issue} & Xác nhận cấp lại hoặc thu hồi mã QR cho một nhân viên; bắt buộc nhập lý do (3--200 ký tự) khi thu hồi và cập nhật lại đúng dòng nhân viên sau khi hoàn tất. \\
+\hline
+\texttt{A-04} & Tab Trạm & \texttt{\#/stations} \textit{(tab)} & \texttt{GET /stations} & Theo dõi danh sách trạm cổng của hai nhà máy, làm mới mỗi 5 giây: trạng thái trực tuyến/ngoại tuyến, thời điểm heartbeat gần nhất, độ sâu outbox và trạng thái cổng xoay. \\
+\hline
+\texttt{A-05} & Hộp thoại thao tác hàng loạt & Dialog trên \texttt{A-02} & \texttt{POST} \path{.../qr/revoke}, \texttt{POST} \path{.../qr/issue} & Hỗ trợ thu hồi hoặc cấp lại mã QR cho nhiều nhân viên đã chọn bằng cách gọi tuần tự từng API, kiểm tra điều kiện trước khi chạy, yêu cầu nhập chuỗi xác nhận nếu thu hồi từ 5 người trở lên và dừng ngay khi gặp 401/403. \\
+\hline
+\end{longtable}
+\normalsize
+
+Quy tắc bảo vệ điều hướng (route guard) của Portal và Admin được thực thi nhất quán: khi mở trang,
+nếu không có token trong \texttt{sessionStorage} hoặc \texttt{GET /auth/me} trả về 401 thì xóa phiên
+và chuyển về \texttt{AU-01}; nếu trả về 200 nhưng vai trò không khớp trang thì chuyển sang
+\texttt{AU-02}. Mọi thao tác bị từ chối 401 từ bất kỳ màn hình nào đều buộc đăng nhập lại. Riêng
+Kiosk (\texttt{K-01}--\texttt{K-05}) hoạt động không cần đăng nhập trong mạng LAN cô lập của nhà máy
+theo ADR-08. Hình~\ref{fig:ui-admin-employees} và Hình~\ref{fig:ui-admin-stations} minh họa giao diện
+quản trị thực tế của hai tab Nhân viên và Trạm cổng.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/09_system_implementation/ui_admin_employees.png}
+    \caption{Giao diện quản trị tab Nhân viên (\texttt{A-02}) hỗ trợ tìm kiếm, lọc bộ phận và thao tác cấp lại/thu hồi mã QR}
+    \label{fig:ui-admin-employees}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/09_system_implementation/ui_admin_stations.png}
+    \caption{Giao diện quản trị tab Trạm (\texttt{A-04}) giám sát trạng thái trực tuyến, heartbeat, outbox và cổng xoay của hai nhà máy}
+    \label{fig:ui-admin-stations}
+\end{figure}
+
+\subsection{Thiết kế và đặc tả hợp đồng API}\label{sec:api-design-implementation}
+
+\subsubsection{Phương pháp contract-first và quy ước chung}
+
+Hệ thống áp dụng phương pháp thiết kế API theo hướng \textit{contract-first} bằng đặc tả OpenAPI
+3.0.3, làm chuẩn thống nhất cho cả sinh mã kiểu TypeScript phía frontend, tạo dữ liệu giả lập MSW và
+đối chiếu tài liệu runtime tại \texttt{/v3/api-docs} do Springdoc công bố. Các quy ước giao tiếp dùng
+chung trên toàn bộ 19 đường dẫn (20 thao tác) gồm:
+\begin{itemize}
+    \item \textbf{Định dạng dữ liệu:} Request và response thành công dùng
+    \texttt{application/json; charset=utf-8} với tên trường theo \texttt{camelCase}, giá trị enum
+    theo \texttt{UPPER\_SNAKE\_CASE}, dấu thời gian theo chuẩn ISO-8601 UTC (hậu tố \texttt{Z}), mã
+    sự kiện và credential theo UUID v4, mã nhân viên theo mẫu \texttt{E[0-9]\{4\}}, mã trạm theo mẫu
+    \texttt{[A-Z]\{2\}-(IN|OUT)-[0-9]\{2\}}.
+    \item \textbf{Tương thích ngược:} Các trường không có giá trị được lược bỏ thay vì trả
+    \texttt{null}; cả client và server đều bỏ qua trường chưa biết để việc bổ sung trường tùy chọn
+    không phá vỡ các phiên bản đang chạy.
+    \item \textbf{Định dạng lỗi chuẩn:} Mọi lỗi giao thức trả về theo chuẩn RFC 9457 Problem Details
+    (media type \path{application/problem+json}) gồm \texttt{type}, \texttt{title}, \texttt{status},
+    \texttt{detail} và trường \texttt{code} ổn định để client rẽ nhánh xử lý (riêng mã
+    \texttt{VALIDATION\_ERROR} kèm thêm mảng \texttt{errors: [\{field, message\}]}).
+    \item \textbf{Bảo mật nhật ký:} Tuyệt đối không ghi chuỗi QR thô (\texttt{raw}), JWT, mật khẩu
+    hay \texttt{X-Gate-Key} vào log ứng dụng; chỉ ghi \texttt{eventId}, \texttt{cid} và tên đăng nhập
+    (NFR-PRI-03).
+\end{itemize}
+
+\subsubsection{Danh mục đầy đủ các endpoint}
+
+Hợp đồng API được chia thành bốn nhóm tương ứng với từng ranh giới triển khai và đối tượng tiêu thụ:
+\textbf{Gate Agent} (cổng \texttt{:8081}/\texttt{:8082}, phục vụ Kiosk và bảo vệ), \textbf{Central}
+(cổng \texttt{:8080}, phục vụ Portal và Admin), \textbf{Sync} (cổng \texttt{:8080/sync}, kết nối giữa
+hai quantum Q1--Q2) và \textbf{Turnstile Simulator} (cổng \texttt{:9001}/\texttt{:9002}, giả lập
+thiết bị cổng xoay). Bảng~\ref{tab:mvp-api-index} liệt kê toàn bộ 19 path / 20 operation của MVP.
+
+\small
+\begin{longtable}{|>{\raggedright\arraybackslash}p{1.9cm}|>{\raggedright\arraybackslash}p{1.5cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{4.4cm}|}
+\caption{Danh mục đầy đủ 19 đường dẫn (20 thao tác) API của phiên bản MVP}\label{tab:mvp-api-index}\\
+\hline
+\textbf{Nhóm} & \textbf{Method} & \textbf{Path} & \textbf{Xác thực} & \textbf{Chức năng} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Nhóm} & \textbf{Method} & \textbf{Path} & \textbf{Xác thực} & \textbf{Chức năng} \\
+\hline
+\endhead
+\hline
+\multicolumn{5}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
+\endfoot
+\hline
+\endlastfoot
+Gate Agent & POST & \path{/scan} & LAN (không) & Xác minh QR, ghi lượt quét và mở cổng xoay \\
+\hline
+Gate Agent & GET & \path{/status} & LAN (không) & Trạng thái kết nối, outbox và sức khỏe cổng \\
+\hline
+Gate Agent & GET & \path{/guard/pending} & LAN (không) & Danh sách lượt còn \texttt{PENDING} trước khi khởi động lại \\
+\hline
+Gate Agent & POST & \path{/admin/simulate-offline} & LAN (profile demo) & Bật/tắt giả lập mất kết nối WAN \\
+\hline
+Central & POST & \path{/auth/login} & Công khai & Xác thực tài khoản và phát hành JWT RS256 \\
+\hline
+Central & GET & \path{/auth/me} & JWT (mọi vai trò) & Trả về danh tính và vai trò phiên hiện tại \\
+\hline
+Central & GET & \path{/portal/qr-token} & JWT (\texttt{EMPLOYEE}) & Phát hành mã QR động (hiệu lực 60 giây) \\
+\hline
+Central & GET & \path{/employees} & JWT (\texttt{ADMIN}) & Tra cứu, lọc danh sách nhân viên và trạng thái QR \\
+\hline
+Central & POST & \path{/employees/{code}/qr/issue} & JWT (\texttt{ADMIN}) & Cấp mới hoặc cấp lại credential QR (INV-01) \\
+\hline
+Central & POST & \path{/employees/{code}/qr/revoke} & JWT (\texttt{ADMIN}) & Thu hồi credential QR đang hoạt động kèm lý do \\
+\hline
+Central & GET & \path{/stations} & JWT (\texttt{ADMIN}) & Danh sách trạm cổng, trạng thái online và outbox \\
+\hline
+Sync & POST & \path{/sync/events} & \texttt{X-Gate-Key} & Đẩy lô 1--200 sự kiện theo cơ chế idempotent \\
+\hline
+Sync & GET & \path{/sync/snapshot} & \texttt{X-Gate-Key} & Kéo delta dữ liệu tham chiếu từ \texttt{since} version \\
+\hline
+Sync & POST & \path{/sync/heartbeat} & \texttt{X-Gate-Key} & Báo cáo trạng thái sống và outbox của Gate Agent \\
+\hline
+Simulator & POST & \path{/turnstiles/{id}/open} & LAN (không) & Mở cổng một lần (idempotent theo \texttt{requestId}) \\
+\hline
+Simulator & GET & \path{/turnstiles/{id}/commands/{requestId}} & LAN (không) & Kiểm tra lệnh mở cổng đã thực thi hay chưa \\
+\hline
+Simulator & GET & \path{/turnstiles/{id}/status} & LAN (không) & Trạng thái và số lượt mở của một cổng xoay \\
+\hline
+Simulator & GET & \path{/turnstiles} & LAN (không) & Danh sách trạng thái mọi cổng xoay hiện có \\
+\hline
+Simulator & GET, PUT & \path{/admin/behavior} & LAN (không) & Đọc hoặc cập nhật độ trễ, tỉ lệ lỗi và chế độ giả lập \\
+\hline
+\end{longtable}
+\normalsize
+
+Hình~\ref{fig:api-swagger-central} minh họa tài liệu OpenAPI 3.0.3 do Springdoc tự động công bố tại
+\texttt{/swagger-ui.html} trên ứng dụng Central, khớp đầy đủ 10 endpoint thuộc năm controller của hai
+nhóm Central và Sync.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/09_system_implementation/api_swagger_central.png}
+    \caption{Giao diện Swagger UI công bố trực tiếp 10 endpoint Central và Sync từ hợp đồng OpenAPI 3.0.3}
+    \label{fig:api-swagger-central}
+\end{figure}
+
+\subsubsection{Đặc tả chi tiết dữ liệu các API cốt lõi}
+
+Bảng~\ref{tab:core-api-payloads} trình bày cấu trúc dữ liệu đầu vào (request) và đầu ra (response)
+của các endpoint trọng yếu nhất trong bốn luồng hoạt động chính của hệ thống.
+
+\small
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{5.4cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
+\caption{Đặc tả dữ liệu đầu vào và đầu ra các API cốt lõi}\label{tab:core-api-payloads}\\
+\hline
+\textbf{Endpoint} & \textbf{Đầu vào (Request)} & \textbf{Đầu ra thành công (Response)} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Endpoint} & \textbf{Đầu vào (Request)} & \textbf{Đầu ra thành công (Response)} \\
+\hline
+\endhead
+\hline
+\multicolumn{3}{r}{\textit{Còn tiếp sang trang sau...}} \\
+\hline
+\endfoot
+\hline
+\endlastfoot
+\texttt{POST /scan} & JSON: \texttt{stationId} (chuỗi \texttt{BD-IN-01}), \texttt{raw} (1--1024 ký tự, chuỗi \texttt{TMC1.<payload>.<sig>}). & \texttt{200 OK}: \texttt{result} (\texttt{ACCEPTED} / \texttt{REJECTED} / \texttt{GATE\_FAILED}), \texttt{reason} (nếu không chấp nhận), \texttt{employeeCode} (chỉ có khi không bị \texttt{REJECTED}), \texttt{direction} (\texttt{IN}/\texttt{OUT}), \texttt{elapsedMs}, \texttt{eventId} (UUID). \\
+\hline
+\texttt{GET /status} & Không tham số. & \texttt{200 OK}: \texttt{gateId}, \texttt{online} (bool), \texttt{lastSyncAt}, \texttt{outboxDepth}, \texttt{offlineThresholdExceeded} (bool), \texttt{pendingReconcile}, \texttt{turnstiles} (bản đồ \texttt{stationId} $\rightarrow$ \texttt{UP}/\texttt{DOWN}/\texttt{CIRCUIT\_OPEN}). \\
+\hline
+\texttt{POST /auth/login} & JSON: \texttt{username} (1--32 ký tự, không phân biệt hoa thường), \texttt{password} (1--128 ký tự). & \texttt{200 OK}: \texttt{accessToken} (JWT RS256), \texttt{expiresAt} (+8 giờ), \texttt{role} (\texttt{EMPLOYEE}/\texttt{ADMIN}), \texttt{employeeCode} (chỉ có với \texttt{EMPLOYEE}). \\
+\hline
+\texttt{GET} \path{/portal/qr-token} & Header \texttt{Authorization: Bearer <JWT>}. Không có tham số. & \texttt{200 OK} (kèm \texttt{Cache-Control: no-store}): \texttt{raw} ($\approx 250$ ký tự), \texttt{expiresAt} (+60 giây), \texttt{refreshAfterSec} (\texttt{30}). \\
+\hline
+\texttt{POST} \path{/employees/{code}/qr/revoke} & Path \texttt{code} (\texttt{E0012}); JSON: \texttt{reason} (3--200 ký tự sau khi cắt khoảng trắng). & \texttt{200 OK}: đối tượng \texttt{EmployeeView} mới nhất (\texttt{code}, \texttt{fullName}, \texttt{departmentId}, \texttt{departmentName}, \texttt{factoryId}, \texttt{active}, \texttt{credentialId}, \texttt{credentialStatus=REVOKED}, \texttt{issuedAt}). \\
+\hline
+\texttt{POST /sync/events} & Header \texttt{X-Gate-Key}; JSON \texttt{EventBatch}: \texttt{contractVersion=1}, \texttt{gateId}, \texttt{factoryId}, \texttt{events} (1--200 \texttt{EventEnvelope} gồm \texttt{eventId}, \texttt{type} \texttt{SCAN\_ATTEMPT\_RECORDED} hoặc \texttt{ATTENDANCE\_RECORDED}, \texttt{occurredAt}, \texttt{payload}). & \texttt{200 OK} (\texttt{BatchAck}): \texttt{accepted} (mảng UUID mới lưu), \texttt{duplicates} (mảng UUID đã tồn tại), \texttt{rejected} (mảng \texttt{\{eventId, reason\}} với các lý do \texttt{INVALID\_PAYLOAD}, \texttt{UNKNOWN\_EVENT\_TYPE}, \texttt{UNKNOWN\_STATION}, \texttt{STATION\_NOT\_IN\_FACTORY}). \\
+\hline
+\texttt{GET /sync/snapshot} & Header \texttt{X-Gate-Key}; Query \texttt{since} (int64, mặc định \texttt{0} lấy toàn phần). & \texttt{200 OK} (\texttt{SnapshotDelta}): \texttt{fromVersion}, \texttt{toVersion}, \texttt{credentials} (không chứa họ tên theo DP-12), \texttt{publicKeys} (Ed25519 SPKI base64), \texttt{stations}, \texttt{settings} (\texttt{offlineThresholdMinutes}). \\
+\hline
+\texttt{POST /sync/heartbeat} & Header \texttt{X-Gate-Key}; JSON \texttt{Heartbeat}: \texttt{gateId}, \texttt{sentAt}, \texttt{outboxDepth}, \texttt{lastSyncAt}, \texttt{turnstileStatus}. & \texttt{204 No Content}. Central xem Gate là ngoại tuyến nếu quá 30 giây không nhận được heartbeat mới. \\
+\hline
+\texttt{POST} \path{/turnstiles/{id}/open} & Path \texttt{id} (\texttt{TS-BD-IN-01}); JSON: \texttt{requestId} (UUID chính là \texttt{eventId}). & \texttt{200 OK}: \texttt{requestId}, \texttt{executed=true}, \texttt{duplicate} (bool -- \texttt{true} nếu lệnh đã chạy trước đó), \texttt{at} (thời điểm mở cổng). \\
+\hline
+\end{longtable}
+\normalsize
+
+\subsubsection{Ma trận phân quyền và danh mục mã lỗi chuẩn}
+
+Quyền truy cập API luôn được thực thi tại backend (DP-10); việc ẩn nút trên giao diện chỉ nhằm mục
+đích trải nghiệm người dùng. Bảng~\ref{tab:api-auth-matrix} và Bảng~\ref{tab:api-error-codes} tổng
+hợp ma trận phân quyền trên Central và danh mục mã lỗi Problem Details dùng chung trên toàn hệ thống.
+
+\begin{table}[H]
+\centering
+\caption{Ma trận xác thực và phân quyền API phía Central}
+\label{tab:api-auth-matrix}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}p{1.8cm}|>{\centering\arraybackslash}p{2.1cm}|>{\centering\arraybackslash}p{1.8cm}|>{\centering\arraybackslash}p{2.2cm}|}
+\hline
+\textbf{Nhóm đường dẫn} & \textbf{Công khai} & \textbf{\texttt{EMPLOYEE}} & \textbf{\texttt{ADMIN}} & \textbf{\texttt{X-Gate-Key}} \\
+\hline
+\texttt{/auth/login}, trang tĩnh, \texttt{/actuator/health}, \texttt{/v3/api-docs} & Cho phép & Cho phép & Cho phép & -- \\
+\hline
+\texttt{/auth/me} & 401 & Cho phép & Cho phép & -- \\
+\hline
+\texttt{/portal/qr-token} & 401 & Cho phép & 403 & -- \\
+\hline
+\texttt{/employees/**}, \texttt{/stations} & 401 & 403 & Cho phép & -- \\
+\hline
+\texttt{/sync/**} & 401 & 401 & 401 & Cho phép \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Danh mục mã lỗi chuẩn (RFC 9457 Problem Details) trên các nhóm API}
+\label{tab:api-error-codes}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{4.3cm}|>{\centering\arraybackslash}p{1.2cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Mã \texttt{code}} & \textbf{HTTP} & \textbf{API phát sinh} & \textbf{Ngữ cảnh và xử lý phía client} \\
+\hline
+\texttt{VALIDATION\_ERROR} & 400 & Mọi API & Thiếu trường bắt buộc, sai kiểu hoặc vượt độ dài; trả kèm danh sách \texttt{errors} theo từng trường. \\
+\hline
+\texttt{INVALID\_CREDENTIALS} & 401 & \texttt{POST /auth/login} & Sai tài khoản, sai mật khẩu hoặc tài khoản bị khóa (trả cùng một mã lỗi để tránh dò tài khoản). \\
+\hline
+\texttt{UNAUTHENTICATED} & 401 & Central (JWT) & Thiếu token, token hết hạn hoặc sai chữ ký; client xóa token và quay về màn hình \texttt{AU-01}. \\
+\hline
+\texttt{FORBIDDEN} & 403 & Central (JWT) & Token hợp lệ nhưng sai vai trò; client hiển thị màn hình \texttt{AU-02}. \\
+\hline
+\texttt{EMPLOYEE\_NOT\_FOUND} & 404 & \path{/employees/{code}/qr/*} & Mã nhân viên không tồn tại; giao diện tải lại danh sách. \\
+\hline
+\texttt{CREDENTIAL\_REVOKED}, \texttt{NO\_ACTIVE\_CREDENTIAL}, \texttt{EMPLOYEE\_INACTIVE} & 409 & \path{/portal/qr-token}, \path{/qr/issue}, \path{/qr/revoke} & Xung đột trạng thái nghiệp vụ; Portal chuyển sang \texttt{P-02} và thông báo liên hệ HR. \\
+\hline
+\texttt{CONCURRENT\_UPDATE} & 409 & \texttt{POST} \path{.../qr/issue} & Hai quản trị viên thao tác đồng thời trên cùng nhân viên; yêu cầu tải lại và thử lại. \\
+\hline
+\texttt{LOCAL\_STORE\_ERROR} & 500 & Gate \texttt{/scan}, \path{/guard/pending} & Lỗi ghi/đọc SQLite cục bộ; Kiosk báo \textit{``Không xác định -- vui lòng gặp bảo vệ''}. \\
+\hline
+\texttt{INVALID\_GATE\_KEY}, \texttt{GATE\_MISMATCH}, \texttt{UNKNOWN\_GATE} & 401 / 403 & \texttt{/sync/**} & Sai khóa trạm, sai ánh xạ \texttt{gateId} hoặc trạm chưa đăng ký; Gate giữ nguyên outbox và ghi log lỗi cấu hình. \\
+\hline
+\texttt{UNSUPPORTED\_}\allowbreak\texttt{CONTRACT\_VERSION}, \texttt{BATCH\_TOO\_LARGE} & 400 & \texttt{POST /sync/events} & Lệch phiên bản hợp đồng (\texttt{$\neq 1$}) hoặc lô vượt quá 200 sự kiện. \\
+\hline
+\texttt{SIMULATED\_ERROR}, \texttt{SIMULATED\_TIMEOUT} & 500 / 504 & Simulator \texttt{/open} & Lỗi giả lập phần cứng; Gate Agent ánh xạ tương ứng thành \texttt{GATE\_ERROR} và \texttt{GATE\_TIMEOUT}. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Các kịch bản kiểm thử đơn vị, kiểm thử hợp đồng API, kiểm thử tích hợp đầu-cuối (bao gồm kịch bản
+mất kết nối WAN, đồng bộ bù outbox, timeout cổng xoay và thu hồi mã QR) cũng như đánh giá hiệu năng
+chịu tải giờ giao ca cho toàn bộ các chức năng và endpoint đã hiện thực ở chương này sẽ được trình
+bày chi tiết trong Chương 10.
