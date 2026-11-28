@@ -172,53 +172,55 @@ Agent và cổng xoay trong cùng nhà máy.
     \draw[line width=1pt, draw=blue!80] (postgres.south) -- (-4.2, 1.8);
     \draw[line width=1pt, draw=blue!80] (central.south)   -- ( 2.8, 1.8);
 
-    % Factory BD Box (Bottom Left)
-    \node[groupbox=teal!5, minimum width=7.3cm, minimum height=4.6cm] (boxbd) at (-4.0, -1.1) {};
-    \node[font=\footnotesize\bfseries\color{teal!80!black}, above=4pt of boxbd.north, anchor=south]
-        {NHÀ MÁY BÌNH DƯƠNG (BD)};
+    % Factory BD Box (Bottom Left) -- hạ xuống để tách khỏi bus wan
+    \node[groupbox=teal!5, minimum width=7.3cm, minimum height=4.6cm] (boxbd) at (-4.0, -1.4) {};
 
-    \node[service, text width=5.8cm] (gatebd) at (-4.0, -0.1) {
+    \node[service, text width=5.8cm] (gatebd) at (-4.0, -0.4) {
         \textbf{gate-bd} (Gate Agent -- Q1)\\
         \textsf{\scriptsize SQLite WAL, Outbox, G1--G5, Web Kiosk}\\
         \textsf{\scriptsize Cổng host:} \texttt{8081} \quad \textsf{\scriptsize Vol:} \texttt{gate-bd-data}
     };
 
-    \draw[netbus=teal!60] (-7.2, -1.3) -- (-0.8, -1.3)
+    \draw[netbus=teal!60] (-7.2, -1.6) -- (-0.8, -1.6)
         node[right, font=\scriptsize\bfseries\color{teal!80!black}] {\texttt{lan-bd}};
 
-    \node[service, text width=5.8cm] (tsbd) at (-4.0, -2.4) {
+    \node[service, text width=5.8cm] (tsbd) at (-4.0, -2.7) {
         \textbf{turnstile-sim-bd} (Giả lập cổng xoay)\\
         \textsf{\scriptsize TS-BD-IN-01, TS-BD-OUT-01}\\
         \textsf{\scriptsize Cổng host:} \texttt{9001}
     };
 
     \draw[line width=1pt, draw=blue!80]  (gatebd.north) -- (-4.0, 1.8);
-    \draw[line width=1pt, draw=teal!80]  (gatebd.south) -- (-4.0, -1.3);
-    \draw[line width=1pt, draw=teal!80]  (tsbd.north)   -- (-4.0, -1.3);
+    \draw[line width=1pt, draw=teal!80]  (gatebd.south) -- (-4.0, -1.6);
+    \draw[line width=1pt, draw=teal!80]  (tsbd.north)   -- (-4.0, -1.6);
 
-    % Factory LA Box (Bottom Right)
-    \node[groupbox=orange!5, minimum width=7.3cm, minimum height=4.6cm] (boxla) at (4.0, -1.1) {};
-    \node[font=\footnotesize\bfseries\color{orange!80!black}, above=4pt of boxla.north, anchor=south]
-        {NHÀ MÁY LONG AN (LA)};
+    % Factory LA Box (Bottom Right) -- hạ xuống để tách khỏi bus wan
+    \node[groupbox=orange!5, minimum width=7.3cm, minimum height=4.6cm] (boxla) at (4.0, -1.4) {};
 
-    \node[service, text width=5.8cm] (gatela) at (4.0, -0.1) {
+    \node[service, text width=5.8cm] (gatela) at (4.0, -0.4) {
         \textbf{gate-la} (Gate Agent -- Q1)\\
         \textsf{\scriptsize SQLite WAL, Outbox, G1--G5, Web Kiosk}\\
         \textsf{\scriptsize Cổng host:} \texttt{8082:8081} \quad \textsf{\scriptsize Vol:} \texttt{gate-la-data}
     };
 
-    \draw[netbus=orange!60] (0.8, -1.3) -- (7.2, -1.3)
+    \draw[netbus=orange!60] (0.8, -1.6) -- (7.2, -1.6)
         node[right, font=\scriptsize\bfseries\color{orange!80!black}] {\texttt{lan-la}};
 
-    \node[service, text width=5.8cm] (tsla) at (4.0, -2.4) {
+    \node[service, text width=5.8cm] (tsla) at (4.0, -2.7) {
         \textbf{turnstile-sim-la} (Giả lập cổng xoay)\\
         \textsf{\scriptsize TS-LA-IN-01, TS-LA-OUT-01}\\
         \textsf{\scriptsize Cổng host:} \texttt{9002:9001}
     };
 
     \draw[line width=1pt, draw=blue!80]   (gatela.north) -- (4.0, 1.8);
-    \draw[line width=1pt, draw=orange!80] (gatela.south) -- (4.0, -1.3);
-    \draw[line width=1pt, draw=orange!80] (tsla.north)   -- (4.0, -1.3);
+    \draw[line width=1pt, draw=orange!80] (gatela.south) -- (4.0, -1.6);
+    \draw[line width=1pt, draw=orange!80] (tsla.north)   -- (4.0, -1.6);
+
+    % Tiêu đề nhà máy vẽ sau cùng, nền trắng đè lên nét nối dọc (tránh nét cắt ngang chữ)
+    \node[font=\footnotesize\bfseries\color{teal!80!black}, fill=white, inner sep=2pt,
+        above=5pt of boxbd.north, anchor=south] {NHÀ MÁY BÌNH DƯƠNG (BD)};
+    \node[font=\footnotesize\bfseries\color{orange!80!black}, fill=white, inner sep=2pt,
+        above=5pt of boxla.north, anchor=south] {NHÀ MÁY LONG AN (LA)};
 \end{tikzpicture}
 \end{adjustbox}
 \caption{Cấu hình triển khai container hóa và phân tách mạng mô phỏng hai nhà máy}
@@ -409,7 +411,12 @@ Hình~\ref{fig:seq-scan-2phase}.
     \node[actor, minimum width=2.8cm] (db) at (9.6, 0) {SQLite LocalStore\\(\texttt{G3 Store})};
     \node[actor, minimum width=2.8cm] (ts) at (13.0, 0) {TurnstileGateway\\(\texttt{G2 / Thiết bị})};
 
-    % Lifeline lines
+    % Hộp vùng giao dịch (vẽ trước, dưới cùng) -- để lifeline đè lên trên, không bị che
+    \node[txbox=orange, minimum width=9.2cm, minimum height=2.0cm, anchor=north west] at (4.9, -3.2) {};
+    \node[txbox=purple, minimum width=9.2cm, minimum height=2.6cm, anchor=north west] at (4.9, -5.6) {};
+    \node[txbox=teal,   minimum width=9.2cm, minimum height=2.0cm, anchor=north west] at (4.9, -8.9) {};
+
+    % Lifeline lines (vẽ đè lên hộp để liền mạch)
     \draw[lifeline] (kiosk) -- (0, -12.0);
     \draw[lifeline] (ctrl)  -- (2.6, -12.0);
     \draw[lifeline] (uc)    -- (6.0, -12.0);
@@ -421,21 +428,18 @@ Hình~\ref{fig:seq-scan-2phase}.
     \draw[msg] (2.6, -1.8) -- node[above] {\texttt{handle(ScanCommand)}} (6.0, -1.8);
     \node[anchor=west, font=\scriptsize\color{blue!80!black}] at (6.1, -2.5) {$\to$ Xác minh Ed25519 \& duyệt AccessRules};
 
-    % Phase 1: TX #1  (tiêu đề ở y=-3.2, arrow ở y=-4.2 → khoảng cách 1.0cm)
-    \node[txbox=orange, minimum width=9.2cm, minimum height=2.0cm, anchor=north west] at (4.9, -3.2) {};
-    \node[anchor=north west, font=\tiny\bfseries\color{orange!80!black}] at (5.1, -3.3) {GIAO DỊCH 1 (TX \#1) -- Khóa nonce \& Lưu trạng thái PENDING (INV-05)};
-    \draw[msg] (6.0, -4.2) -- node[above, font=\scriptsize] {\texttt{recordPending(attempt, nonce)}} (9.6, -4.2);
+    % Phase 1: TX #1 -- tiêu đề nền màu hộp đè lên lifeline để che nét sau chữ
+    \node[anchor=north west, font=\tiny\bfseries\color{orange!80!black}, fill=orange!8, inner sep=1pt] at (5.1, -3.3) {GIAO DỊCH 1 (TX \#1) -- Khóa nonce \& Lưu trạng thái PENDING (INV-05)};
+    \draw[msg] (6.0, -4.2) -- node[above, font=\scriptsize, fill=orange!8, inner sep=1pt] {\texttt{recordPending(attempt, nonce)}} (9.6, -4.2);
 
-    % Non-transactional Call to turnstile (tiêu đề y=-5.6, arrows y=-6.6 và y=-7.4)
-    \node[txbox=purple, minimum width=9.2cm, minimum height=2.6cm, anchor=north west] at (4.9, -5.6) {};
-    \node[anchor=north west, font=\tiny\bfseries\color{purple!80!black}] at (5.1, -5.7) {NGOÀI GIAO DỊCH -- Gọi thiết bị (Tránh chiếm giữ lock ghi SQLite)};
-    \draw[msg]   (6.0, -6.6) -- node[above, font=\scriptsize] {\texttt{open(turnstileId, eventId)} (800\,ms, CB)} (13.0, -6.6);
-    \draw[reply] (6.0, -7.5) -- node[above, font=\scriptsize] {Trả về \texttt{OPENED} (hoặc đối soát \texttt{status()})} (13.0, -7.5);
+    % Non-transactional Call to turnstile
+    \node[anchor=north west, font=\tiny\bfseries\color{purple!80!black}, fill=purple!8, inner sep=1pt] at (5.1, -5.7) {NGOÀI GIAO DỊCH -- Gọi thiết bị (Tránh chiếm giữ lock ghi SQLite)};
+    \draw[msg]   (6.0, -6.6) -- node[above, font=\scriptsize, fill=purple!8, inner sep=1pt] {\texttt{open(turnstileId, eventId)} (800\,ms, CB)} (13.0, -6.6);
+    \draw[reply] (6.0, -7.5) -- node[above, font=\scriptsize, fill=purple!8, inner sep=1pt] {Trả về \texttt{OPENED} (hoặc đối soát \texttt{status()})} (13.0, -7.5);
 
-    % Phase 2: TX #2 (tiêu đề y=-8.9, arrow y=-9.9)
-    \node[txbox=teal, minimum width=9.2cm, minimum height=2.0cm, anchor=north west] at (4.9, -8.9) {};
-    \node[anchor=north west, font=\tiny\bfseries\color{teal!80!black}] at (5.1, -9.0) {GIAO DỊCH 2 (TX \#2) -- Chốt ACCEPTED, lưu giao dịch \& Outbox};
-    \draw[msg] (6.0, -9.9) -- node[above, font=\scriptsize] {\texttt{confirmAccepted(eventId, tx)} $\to$ Chốt \texttt{ACCEPTED} + Outbox} (9.6, -9.9);
+    % Phase 2: TX #2
+    \node[anchor=north west, font=\tiny\bfseries\color{teal!80!black}, fill=teal!8, inner sep=1pt] at (5.1, -9.0) {GIAO DỊCH 2 (TX \#2) -- Chốt ACCEPTED, lưu giao dịch \& Outbox};
+    \draw[msg] (6.0, -9.9) -- node[above, font=\scriptsize, fill=teal!8, inner sep=1pt] {\texttt{confirmAccepted(eventId, tx)} $\to$ Chốt \texttt{ACCEPTED} + Outbox} (9.6, -9.9);
 
     % Final response
     \draw[reply] (2.6, -10.8) -- node[above, font=\scriptsize] {\texttt{ScanOutcome(ACCEPTED)}} (6.0, -10.8);
